@@ -165,6 +165,10 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
     setPendingFiles(null);
   };
 
+  const triggerUploadClick = () => {
+    document.getElementById('main-file-input')?.click();
+  };
+
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -186,7 +190,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         return (
           <DashboardPage
             files={files}
-            onUploadClick={() => document.getElementById('main-file-input')?.click()}
+            onUploadClick={triggerUploadClick}
             onNavigateToMyFiles={() => setActiveSection('my-files')}
             onOpenVault={() => setActiveSection('digital-vault')}
             onNearbyShare={() => setShowOfflineP2P(true)}
@@ -201,6 +205,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         return (
           <MyFilesPage
             files={files}
+            onUploadClick={triggerUploadClick}
             onOpenViewer={(f) => setViewingFile(f)}
             onOpenShareModal={(f) => setShareModalFile(f)}
             onOpenControlCenter={(f) => setControlCenterFile(f)}
