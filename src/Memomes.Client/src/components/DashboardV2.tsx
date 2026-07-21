@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, LogOut, Video, FileText, RefreshCw, Wifi, Zap, Sparkles,
-  Grid, List, ArrowUpDown, MoreVertical, Bell, Star
+  Grid, List, ArrowUpDown, MoreVertical, Bell, Star, Eye, Share2, ShieldCheck
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Breadcrumbs } from './Breadcrumbs';
@@ -15,6 +15,8 @@ import { WatermarkedViewer } from './WatermarkedViewer';
 import { OfflineP2PSync } from './OfflineP2PSync';
 import { PricingModal } from './PricingModal';
 import { AccountPurgeModal } from './AccountPurgeModal';
+import { SecureShareModal } from './SecureShareModal';
+import { FileControlCenterModal } from './FileControlCenterModal';
 import { UploadPipelineManager, type UploadQueueItem } from '../services/uploadPipeline';
 
 // Section Pages
@@ -41,6 +43,7 @@ export interface FileItem {
   accessTier: 'VIEW_ONLY' | 'READ_DOWNLOAD' | 'FULL_CONTROL';
   isColdStorage: boolean;
   isFavorite?: boolean;
+  activeSharesCount?: number;
   tags?: string[];
   lastAccessedAt: string;
   createdAt: string;
@@ -76,6 +79,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
       accessTier: 'FULL_CONTROL',
       isColdStorage: false,
       isFavorite: true,
+      activeSharesCount: 2,
       tags: ['Personal', 'Goa'],
       lastAccessedAt: new Date().toISOString(),
       createdAt: new Date().toISOString()
@@ -90,6 +94,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
       accessTier: 'READ_DOWNLOAD',
       isColdStorage: false,
       isFavorite: false,
+      activeSharesCount: 1,
       tags: ['Legal', 'Property'],
       lastAccessedAt: new Date().toISOString(),
       createdAt: new Date().toISOString()
@@ -104,6 +109,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
       accessTier: 'VIEW_ONLY',
       isColdStorage: true,
       isFavorite: true,
+      activeSharesCount: 0,
       tags: ['Backup'],
       lastAccessedAt: new Date(Date.now() - 35 * 86400 * 1000).toISOString(),
       createdAt: new Date(Date.now() - 40 * 86400 * 1000).toISOString()
@@ -118,6 +124,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
       accessTier: 'FULL_CONTROL',
       isColdStorage: false,
       isFavorite: false,
+      activeSharesCount: 3,
       tags: ['Work'],
       lastAccessedAt: new Date().toISOString(),
       createdAt: new Date().toISOString()
@@ -125,6 +132,9 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   ]);
 
   const [contextMenu, setContextMenu] = useState<{ file: FileItem; x: number; y: number } | null>(null);
+  const [shareModalFile, setShareModalFile] = useState<FileItem | null>(null);
+  const [controlCenterFile, setControlCenterFile] = useState<FileItem | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchLatencyMs, setSearchLatencyMs] = useState<number | null>(null);
@@ -217,11 +227,9 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
       case 'ai-search': return <AISearchPage />;
       case 'nearby-share': return <NearbySharePage />;
       case 'settings': return <SettingsPage />;
-      default: return null; // Falls through to My Files
+      default: return null;
     }
   };
-
-
 
   const sectionContent = renderSectionPage();
 
@@ -265,10 +273,8 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         </header>
 
         <main className="max-w-7xl mx-auto px-6 pt-6 pb-16">
-          {/* Breadcrumbs */}
           <Breadcrumbs sectionId={activeSection} onNavigateHome={() => setActiveSection('dashboard')} />
 
-          {/* Render dedicated section page OR My Files */}
           {sectionContent ? (
             sectionContent
           ) : (
@@ -339,45 +345,94 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                 </div>
               </div>
 
-              {/* File Grid / Table */}
+              {/* File Grid with 3 Direct Actions: View, Share, Control */}
               {viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                   {sortedFiles.map(file => (
                     <div
                       key={file.id}
                       onContextMenu={(e) => handleContextMenu(e, file)}
-                      className="glass-card rounded-xl p-4 border border-stroke-default flex flex-col justify-between group hover:border-primary/60 transition"
+                      className="glass-card rounded-xl p-4 border border-stroke-default flex flex-col justify-between group hover:border-primary/60 transition relative"
                     >
-                      <FilePreviewRenderer
-                        fileId={file.id}
-                        fileName={file.fileNameEncrypted}
-                        contentType={file.contentTypeEncrypted}
-                        thumbnailUrl={file.thumbnailUrl}
-                        sizeBytes={file.sizeBytes}
-                        onOpen={() => setViewingFile(file)}
-                      />
-                      <div className="mt-3 flex items-start justify-between">
-                        <h4 className="font-semibold text-gray-100 text-xs truncate flex-1 pr-2" title={file.fileNameEncrypted}>
-                          {file.fileNameEncrypted}
-                        </h4>
-                        {file.isFavorite && <Star className="w-3.5 h-3.5 text-accent-gold fill-accent-gold shrink-0" />}
+                      <div>
+                        {/* Real File Preview Container */}
+                        <div className="relative">
+                          <FilePreviewRenderer
+                            fileId={file.id}
+                            fileName={file.fileNameEncrypted}
+                            contentType={file.contentTypeEncrypted}
+                            thumbnailUrl={file.thumbnailUrl}
+                            sizeBytes={file.sizeBytes}
+                            onOpen={() => setViewingFile(file)}
+                          />
+
+                          {/* Shared Badge showing active recipient count */}
+                          {file.activeSharesCount !== undefined && file.activeSharesCount > 0 && (
+                            <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/80 backdrop-blur-md border border-accent-gold/50 rounded-full text-[10px] font-bold text-accent-gold flex items-center gap-1">
+                              <Share2 className="w-3 h-3 text-accent-gold" /> Shared ({file.activeSharesCount})
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex items-start justify-between">
+                          <h4 className="font-semibold text-gray-100 text-xs truncate flex-1 pr-2" title={file.fileNameEncrypted}>
+                            {file.fileNameEncrypted}
+                          </h4>
+                          {file.isFavorite && <Star className="w-3.5 h-3.5 text-accent-gold fill-accent-gold shrink-0" />}
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mt-1">
+                          <span>{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
+                          <span>{new Date(file.createdAt).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mt-1">
-                        <span>{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
-                        <span>{new Date(file.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-stroke-default flex items-center justify-between text-xs">
-                        <button onClick={() => setViewingFile(file)} className="text-accent-gold font-medium hover:underline text-[11px]">
-                          {file.accessTier === 'VIEW_ONLY' ? 'Watermark Stream' : 'Decrypt Preview'}
-                        </button>
-                        <button onClick={(e) => handleContextMenu(e, file)} className="p-1 text-gray-400 hover:text-white">
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
+
+                      {/* 3 Prominent Primary Action Buttons: View, Share, Control + Secondary Menu */}
+                      <div className="mt-4 pt-3 border-t border-stroke-default space-y-2">
+                        <div className="grid grid-cols-3 gap-1.5 text-xs font-bold">
+                          {/* 1. View Button */}
+                          <button
+                            onClick={() => setViewingFile(file)}
+                            className="py-1.5 px-2 bg-surface hover:bg-surface-card border border-stroke-default rounded-lg text-gray-200 hover:text-white transition flex items-center justify-center gap-1"
+                            title="Open / View Stream"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-accent-gold" /> View
+                          </button>
+
+                          {/* 2. Share Button */}
+                          <button
+                            onClick={() => setShareModalFile(file)}
+                            className="py-1.5 px-2 bg-primary/20 hover:bg-primary/40 border border-primary/40 rounded-lg text-accent-gold transition flex items-center justify-center gap-1"
+                            title="Create Secure Share Link"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-accent-gold" /> Share
+                          </button>
+
+                          {/* 3. Control Button */}
+                          <button
+                            onClick={() => setControlCenterFile(file)}
+                            className="py-1.5 px-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 rounded-lg text-amber-300 transition flex items-center justify-center gap-1"
+                            title="Manage Shares & Revoke Access"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-accent-gold" /> Control
+                          </button>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            onClick={(e) => handleContextMenu(e, file)}
+                            className="p-1 text-gray-400 hover:text-white flex items-center gap-1 text-[11px]"
+                            title="More Actions (Rename, Move, Copy, Delete)"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" /> <span className="text-[10px]">More</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
+                /* Tabular List View with Direct Actions */
                 <div className="glass-card rounded-2xl border border-stroke-default overflow-hidden">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-surface-container/90 border-b border-stroke-default text-gray-400 font-mono">
@@ -385,9 +440,9 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                         <th onClick={() => toggleSort('name')} className="p-3.5 cursor-pointer hover:text-white"><div className="flex items-center gap-1">Name <ArrowUpDown className="w-3 h-3" /></div></th>
                         <th onClick={() => toggleSort('type')} className="p-3.5 cursor-pointer hover:text-white"><div className="flex items-center gap-1">Type <ArrowUpDown className="w-3 h-3" /></div></th>
                         <th onClick={() => toggleSort('size')} className="p-3.5 cursor-pointer hover:text-white"><div className="flex items-center gap-1">Size <ArrowUpDown className="w-3 h-3" /></div></th>
-                        <th onClick={() => toggleSort('date')} className="p-3.5 cursor-pointer hover:text-white"><div className="flex items-center gap-1">Date <ArrowUpDown className="w-3 h-3" /></div></th>
-                        <th className="p-3.5">Tier</th>
-                        <th className="p-3.5 text-right">Actions</th>
+                        <th className="p-3.5">Sharing Status</th>
+                        <th className="p-3.5 text-right">Primary Actions</th>
+                        <th className="p-3.5 text-right">More</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stroke-default">
@@ -401,8 +456,24 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                           </td>
                           <td className="p-3.5 text-gray-400 font-mono text-[10px]">{file.contentTypeEncrypted.split('/')[1]?.toUpperCase()}</td>
                           <td className="p-3.5 text-gray-300 font-mono">{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</td>
-                          <td className="p-3.5 text-gray-400 font-mono">{new Date(file.createdAt).toLocaleDateString()}</td>
-                          <td className="p-3.5"><span className="px-2 py-0.5 bg-surface text-accent-gold border border-stroke-default rounded-full text-[10px]">{file.accessTier}</span></td>
+                          <td className="p-3.5">
+                            {file.activeSharesCount && file.activeSharesCount > 0 ? (
+                              <span className="px-2 py-0.5 bg-amber-950/60 text-accent-gold border border-amber-500/30 rounded-full text-[10px] font-bold">
+                                Shared ({file.activeSharesCount})
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-surface text-gray-400 border border-stroke-default rounded-full text-[10px]">
+                                Private
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1 font-bold">
+                              <button onClick={() => setViewingFile(file)} className="px-2 py-1 bg-surface hover:bg-surface-card text-gray-300 hover:text-white border border-stroke-default rounded text-[11px]">View</button>
+                              <button onClick={() => setShareModalFile(file)} className="px-2 py-1 bg-primary/20 text-accent-gold hover:bg-primary/40 border border-primary/30 rounded text-[11px]">Share</button>
+                              <button onClick={() => setControlCenterFile(file)} className="px-2 py-1 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 rounded text-[11px]">Control</button>
+                            </div>
+                          </td>
                           <td className="p-3.5 text-right">
                             <button onClick={(e) => handleContextMenu(e, file)} className="p-1 text-gray-400 hover:text-white"><MoreVertical className="w-4 h-4" /></button>
                           </td>
@@ -417,7 +488,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         </main>
       </div>
 
-      {/* Global Overlays */}
+      {/* Global Modals & Overlays */}
       <UploadQueueDrawer
         queue={uploadQueue}
         onClose={() => setUploadQueue([])}
@@ -431,6 +502,28 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
           onClose={() => setContextMenu(null)}
           onOpen={(file) => setViewingFile(file)}
           onDelete={(fileId) => setFiles(prev => prev.filter(f => f.id !== fileId))}
+        />
+      )}
+
+      {/* Dedicated Secure Share Modal */}
+      {shareModalFile && (
+        <SecureShareModal
+          file={shareModalFile}
+          onClose={() => setShareModalFile(null)}
+          onShareCreated={() => {
+            setFiles(prev => prev.map(f => f.id === shareModalFile.id ? { ...f, activeSharesCount: (f.activeSharesCount || 0) + 1 } : f));
+          }}
+        />
+      )}
+
+      {/* Dedicated File Control Center Modal */}
+      {controlCenterFile && (
+        <FileControlCenterModal
+          file={controlCenterFile}
+          onClose={() => setControlCenterFile(null)}
+          onRevokeAllShares={() => {
+            setFiles(prev => prev.map(f => f.id === controlCenterFile.id ? { ...f, activeSharesCount: 0 } : f));
+          }}
         />
       )}
 
