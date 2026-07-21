@@ -1,0 +1,72 @@
+Git url: https://github.com/sathiyamurthyr/Memomes.git
+
+AGENTS.md — Memomes Cloud Complete Technical & Architecture Specifications
+1. System Architecture & Technology Stack Rules
+Backend Framework: C# .NET 8 Minimal APIs running inside lightweight Linux containers (mcr.microsoft.com/dotnet/aspnet:8.0-alpine).
+Database Engine: PostgreSQL 16+ managed via Entity Framework Core 8 (EF Core 8) with the pgvector extension enabled for encrypted vector embeddings.
+Object Storage Engine: Backblaze B2 integrated via AWSSDK.S3 (S3-compatible API protocol) routed through the Cloudflare Bandwidth Alliance for $0 egress bandwidth costs.
+Frontend App Framework: React 18+ with TypeScript (built using Vite) for Web/PWA, and Flutter / React Native for mobile clients.
+UI Design System & Tokens:
+Background: Dark Slate (#0B0F17 / var(--surface))
+Surface Panel: Surface Container (#10141F / var(--surface-container))
+Primary Accent: Primary Maroon (#A00D3A / var(--primary))
+Secondary Accent: Accent Gold (#FFC928 / var(--secondary))
+Border/Stroke: Subtle Gray (#232836 / var(--stroke-default))
+Currency Display: Exclusively in Indian Rupees (₹ / INR) across all billing, pricing, and storage metrics.
+2. Core Cryptography & Zero-Knowledge Architecture
+Zero-Knowledge Enclosure: All file encryption and decryption operations MUST occur strictly on the client device using the standard Web Crypto API (AES-256-GCM with a 12-byte random initialization vector/nonce and a 16-byte authentication tag per chunk). Unencrypted file bytes or raw master keys must NEVER touch network sockets or backend servers.
+Key Derivation: Master keys are derived on the client using Argon2id / PBKDF2 (100,000+ iterations) using the user's password and a unique account salt.
+Shamir's Social Recovery (3-of-2 SSSS): Account recovery splits the client master encryption key into 3 cryptographic shards:
+Shard 1: Saved in the local device Secure Enclave / Keyring.
+Shard 2: Exported as an encrypted QR / Link for a designated Emergency Contact.
+Shard 3: Encrypted with a secondary recovery PIN and saved in PostgreSQL.
+Any 2 shards combined allow offline client-side key reconstruction without server participation.
+Temporary Vault Lock ("Panic Freeze"): One-tap emergency action that instantly flushes master keys from browser RAM, IndexedDB, and hardware enclaves, while triggering a server API call to invalidate active refresh tokens in PostgreSQL.
+Presigned S3 URLs: All S3 pre-signed upload and download URLs issued by the .NET 8 API must strictly enforce a maximum expiration window of 60 seconds.
+3. Granular Access Control & Sharing Framework
+Granular Access Control Tiers:
+VIEW_ONLY: File rendered into a watermarked HTML5 Canvas stream. Raw file blob downloads and resharing are strictly blocked.
+READ_DOWNLOAD: Clean view and raw file blob decryption allowed. Resharing to secondary recipients requires asynchronous owner approval.
+FULL_CONTROL: Read, write, overwrite new versions, upload, and reshare privileges granted.
+Asymmetric Key Envelopes: Sharing a file or folder requires fetching the recipient's public key (ECDH / RSA-4096) from PostgreSQL, encrypting the file's decryption key into a recipient-specific key envelope, and writing the envelope record to PostgreSQL.
+Reshare Approval Workflow: If a user with READ_DOWNLOAD permissions attempts to share a file, generate an asynchronous notification request to the original owner. Upon owner approval, the owner's client re-encrypts the file key for the new recipient's public key.
+Public File Request Links ("Dropboxes"): Allow unauthenticated users to upload files into a designated folder via a public upload token. The uploader's browser encrypts the file chunks using the owner's public key prior to B2 upload. Uploaders are strictly prohibited from viewing existing folder contents.
+Dynamic Anti-Leak Watermarking: On VIEW_ONLY shared media, render a diagonal, opacity-adjusted canvas watermark overlaying the image or video stream containing: Recipient Email | Resolved IP | Timestamp.
+4. On-Device Local AI & Natural Language Search
+Zero-Knowledge AI Constraint: All image recognition, document OCR, and natural language semantic vector generation MUST run on the client device using WebGPU/Transformers.js (MobileCLIP / ONNX quantized models) or native Mobile Neural Engines (CoreML / NNAPI). Raw photos or unencrypted document text must NEVER be transmitted to cloud LLM APIs (e.g., OpenAI).
+One-Time Model Caching: Download the quantized ~30 MB CLIP vision model on first use and store it in the browser Cache API / device local storage. Process photo indexing in background Web Workers when the device is idle or charging.
+Encrypted Vector Indexing: Client devices convert images and document OCR text into 512-dimension float vectors, encrypt the vector data using the master key, and store them in PostgreSQL via the pgvector extension.
+Natural Language Matching: Queries like "Show me my mom and father photos" or "Find my land deed" are embedded into a vector on the client device, compared against stored vectors via Cosine Similarity, and returned to the user in sub-5ms.
+5. Video Streaming & Large File Chunking Pipeline
+10 MB Multipart Chunking: Files exceeding 100 MB must be split into 10 MB binary chunks on the client prior to upload. Each chunk is encrypted independently with a unique AES-256-GCM nonce and uploaded to Backblaze B2 via S3 multipart presigned URLs.
+Zero-RAM Video Player: Implement a streaming video player using HTTP Range Requests and the HTML5 MediaSource API. The player fetches encrypted 10 MB chunks on-demand as the video playhead advances, decrypts chunks inside a Web Worker, and appends the decoded bytes to the buffer without reading the entire video into RAM.
+RAM Pre-Fetching Ring-Buffer: Maintain a pre-fetch buffer that automatically downloads and decrypts 3 adjacent 10 MB chunks ahead of the current playback position to ensure sub-500ms seeking and playback.
+6. Offline P2P Nearby Sharing & Device Sync
+Offline P2P Protocol: Enable direct device-to-device file transfers over Wi-Fi Direct / Local WebRTC data channels without requiring an active internet connection or backend server interaction.
+Offline Handshake: Generate an offline QR code on the sender's screen containing their local socket IP (192.168.x.x), session ID, and temporary ECDH public key. The receiver scans the QR code to establish a direct local socket.
+Offline Audit Queue: Record all offline transfer events in local IndexedDB / SQLite with unique UUIDs (OfflineLogId), timestamps, and device identities.
+Automatic Reconnection Sync: Register a network state listener (window.addEventListener('online')) that automatically posts queued offline audit logs to /api/audit/sync-offline-logs upon internet restoration. The .NET 8 API must process logs idempotently into PostgreSQL.
+Background Folder Sync: On desktop platforms, utilize FileSystemWatcher to trigger background encryption and upload routines upon local folder changes. On mobile platforms, use WorkManager (DATA_SYNC) and BGTaskScheduler.
+7. Lifecycle Management & Cost Optimization
+Files On-Demand (Smart Virtual Drive): Display virtual folder trees and metadata without automatically downloading raw file contents (0 KB local disk usage). Fetch and decrypt file blobs in local RAM only when explicitly double-clicked.
+30-Day Vault Trash Lifecycle: Soft-delete files into a Vault Trash state in PostgreSQL for 30 days. Allow 1-click restoration before invoking Backblaze B2 DeleteObjects purge API calls after 30 days.
+30-Day Cold Archiving Policy: Execute a daily C# background service (ColdStorageArchiverWorker) sweeping StoredFiles. Any file where LastAccessedAt is older than 30 days must be flagged as IsColdStorage = true to align with automated Backblaze B2 low-cost cold storage lifecycle rules.
+Client-Side Content Deduplication: Calculate a deterministic SHA-256 content hash combined with the user's master key prior to upload. If the hash already exists in their vault, link metadata to the existing B2 blob without re-uploading file bytes.
+8. Governance, Legal Compliance & Bot Defense
+Sub-Millisecond Audit Trail: Log access events in PostgreSQL file_access_logs with resolved MaxMind Geo-IP locations. Retain anonymized access logs for 180 days to comply with CERT-In cybersecurity guidelines.
+Social Media Link Defense: Intercept HTTP User-Agents matching WhatsApp, facebookexternalhit, Twitterbot, LinkedInBot. Return static HTML OpenGraph meta tags without exposing presigned file URLs or triggering log events.
+India DPDP Act Account Purging: Endpoint DELETE /api/account/purge MUST cascade metadata deletion across all PostgreSQL tables and execute batch DeleteObjects requests to Backblaze B2 to permanently destroy all stored encrypted binary blobs.
+Section 79 IT Act Intermediary Safe Harbor: Zero-Knowledge encryption ensures company operators hold no mathematical ability to view user contents, granting full intermediary safe harbor protection.
+9. Business Monetization & INR Payment Infrastructure
+INR Tier Structure:
+Free Vault: 5 GB storage, ₹0/month.
+Pro Solo: 100 GB storage, ₹149/month (or ₹1,490/year). Includes large video streaming, social recovery, and dynamic watermarks.
+Pro Plus: 500 GB storage, ₹399/month (or ₹3,990/year).
+Family Vault: 1 TB storage, ₹699/month (or ₹6,990/year) shared across 5 isolated member accounts.
+Razorpay UPI AutoPay Integration: Handle recurring subscription billing via Razorpay's UPI AutoPay e-mandate API. Handle Webhook events at POST /api/payments/razorpay-webhook listening for subscription.charged to update subscription expiration dates (ExpiresAt = DateTime.UtcNow.AddDays(31)).
+0% Fee Optimization: Default all checkout interfaces to UPI / UPI AutoPay to eliminate credit card processing fees under NPCI guidelines.
+10. Dashboard UI/UX & Onboarding Standards
+World-Class Glassmorphism Dashboard: Feature multi-colored segmented progress bars representing storage allocation across file categories (Video #A00D3A, Photo #FFC928, Docs #3B82F6, Archive #10B981).
+Interactive Security Panel: Display an active status widget with AES-256-GCM verification badges, active session counts, and a prominent "Freeze Vault" emergency Panic Lock button.
+Onboarding Privacy Microcopy: During model loading or file indexing, display reassuring UI tooltips: "Running 100% Zero-Knowledge AI on your device. Your unencrypted photos and files never reach the server."
+Re-hydration Progress State: For cold-archived files (>30 days untouched), display an active status badge ("Waking up file from cold vault...") with low-resolution encrypted thumbnail pre-renders while the full blob downloads in the background.

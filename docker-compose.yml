@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: memomes-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: memomes
+      POSTGRES_USER: memomes_user
+      POSTGRES_PASSWORD: memomes_secure_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memomes_user -d memomes"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Memomes.Api/Dockerfile
+    container_name: memomes-api
+    restart: always
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=db;Database=memomes;Username=memomes_user;Password=memomes_secure_password_123
+      - AWS__ServiceURL=https://s3.us-west-004.backblazeb2.com
+      - AWS__AccessKeyId=mock_b2_access_key
+      - AWS__SecretAccessKey=mock_b2_secret_key
+      - AWS__BucketName=memomes-vault-bucket
+      - AWS__Region=us-west-004
+      - JWT__SecretKey=MemomesZeroKnowledgeSuperSecretKey2026SecureVault!
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
