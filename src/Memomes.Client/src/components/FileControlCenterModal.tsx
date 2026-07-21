@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ShieldAlert, ShieldCheck, Eye, Download, Users, Clock, Flame, BarChart2,
-  FileText, X, KeyRound, DownloadCloud
+  FileText, X, KeyRound, DownloadCloud, Check
 } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
 
@@ -17,6 +17,7 @@ export const FileControlCenterModal: React.FC<FileControlCenterModalProps> = ({
   onRevokeAllShares
 }) => {
   const [activeTab, setActiveTab] = useState<'SHARES' | 'PERMISSIONS' | 'ANALYTICS' | 'AUDIT'>('SHARES');
+  const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
   
   const [sharesList, setSharesList] = useState([
     { id: 's1', recipient: 'rahul@example.com', tier: 'VIEW_ONLY', expiry: '60s Presigned', views: 12, downloads: 0, status: 'Active', created: '2026-07-21' },
@@ -26,13 +27,20 @@ export const FileControlCenterModal: React.FC<FileControlCenterModalProps> = ({
   const [disableDownloads, setDisableDownloads] = useState(true);
   const [selfDestructEnabled, setSelfDestructEnabled] = useState(false);
 
+  const showFeedback = (msg: string) => {
+    setStatusFeedback(msg);
+    setTimeout(() => setStatusFeedback(null), 3000);
+  };
+
   const handleRevokeShare = (id: string) => {
     setSharesList(prev => prev.filter(s => s.id !== id));
+    showFeedback('Recipient access key revoked instantly.');
   };
 
   const handleRevokeAll = () => {
     setSharesList([]);
     if (onRevokeAllShares) onRevokeAllShares();
+    showFeedback('All recipient access keys revoked permanently.');
   };
 
   return (
@@ -45,7 +53,14 @@ export const FileControlCenterModal: React.FC<FileControlCenterModalProps> = ({
           <X className="w-4 h-4" />
         </button>
 
-        {/* Header with File Info & Core Promise Banner */}
+        {/* Feedback Banner */}
+        {statusFeedback && (
+          <div className="p-2.5 bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-xs font-mono rounded-xl flex items-center gap-2 animate-in fade-in duration-150">
+            <Check className="w-4 h-4" /> {statusFeedback}
+          </div>
+        )}
+
+        {/* Header with File Info */}
         <div className="flex items-center justify-between border-b border-stroke-default pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
@@ -144,7 +159,10 @@ export const FileControlCenterModal: React.FC<FileControlCenterModalProps> = ({
               <input
                 type="checkbox"
                 checked={disableDownloads}
-                onChange={(e) => setDisableDownloads(e.target.checked)}
+                onChange={(e) => {
+                  setDisableDownloads(e.target.checked);
+                  showFeedback(`Downloads ${e.target.checked ? 'disabled' : 'enabled'} for active links.`);
+                }}
                 className="rounded border-stroke-default accent-primary w-4 h-4"
               />
             </div>
@@ -159,7 +177,10 @@ export const FileControlCenterModal: React.FC<FileControlCenterModalProps> = ({
               <input
                 type="checkbox"
                 checked={selfDestructEnabled}
-                onChange={(e) => setSelfDestructEnabled(e.target.checked)}
+                onChange={(e) => {
+                  setSelfDestructEnabled(e.target.checked);
+                  showFeedback(`Self-Destruct ${e.target.checked ? 'activated' : 'deactivated'}.`);
+                }}
                 className="rounded border-stroke-default accent-orange-500 w-4 h-4"
               />
             </div>
@@ -172,7 +193,7 @@ export const FileControlCenterModal: React.FC<FileControlCenterModalProps> = ({
                 <div className="text-[10px] text-gray-500">Add time to active presigned URLs</div>
               </div>
               <button
-                onClick={() => alert('Extended active share timers by +24 hours.')}
+                onClick={() => showFeedback('Active share timers extended by +24 hours.')}
                 className="px-3 py-1.5 bg-surface-card border border-stroke-default text-accent-gold font-bold rounded-lg hover:bg-surface-hover transition"
               >
                 +24 Hours
@@ -216,7 +237,7 @@ export const FileControlCenterModal: React.FC<FileControlCenterModalProps> = ({
             <div className="flex justify-between items-center">
               <span className="text-gray-400 font-mono">180-Day CERT-In Access Trail</span>
               <button
-                onClick={() => alert('CERT-In Audit Log JSON exported.')}
+                onClick={() => showFeedback('CERT-In Audit Log JSON exported.')}
                 className="px-3 py-1 bg-surface-card border border-stroke-default text-accent-gold font-bold rounded-lg hover:bg-surface-hover transition flex items-center gap-1"
               >
                 <DownloadCloud className="w-3.5 h-3.5" /> Export JSON

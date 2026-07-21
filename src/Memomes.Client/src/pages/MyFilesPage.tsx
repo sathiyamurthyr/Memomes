@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Folder, Search, Grid, List, MoreVertical, Eye, Share2, ShieldCheck,
   ChevronRight, Image as ImageIcon, Video, FileText, Music, Archive, FileCode,
-  Upload, Download, FolderInput, CheckSquare, Square, X, FolderPlus
+  Upload, Download, FolderInput, CheckSquare, Square, X, FolderPlus, Check
 } from 'lucide-react';
 import { FilePreviewRenderer } from '../components/FilePreviewRenderer';
 import { FileDetailsPanel } from '../components/FileDetailsPanel';
+import { CreateFolderModal } from '../components/CreateFolderModal';
 import type { FileItem } from '../components/DashboardV2';
 
 interface MyFilesPageProps {
@@ -42,7 +43,16 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
   // Drag-and-Drop Overlay State
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Keyboard Shortcuts Listener (Ctrl+A, ESC, Delete, Ctrl+V)
+  // Modals & Toast State
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Keyboard Shortcuts Listener (Ctrl+A, ESC, Delete)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -54,7 +64,7 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
         setSelectedFileIds([]);
         setInspectedFile(null);
       } else if (e.key === 'Delete' && selectedFileIds.length > 0) {
-        alert(`Soft deleted ${selectedFileIds.length} files to Vault Trash.`);
+        showToast(`Soft deleted ${selectedFileIds.length} files to Vault Trash.`);
         setSelectedFileIds([]);
       }
     };
@@ -117,7 +127,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
         prev.includes(fileId) ? prev.filter(id => id !== fileId) : [...prev, fileId]
       );
     } else {
-      // Single selection toggles details inspector
       const file = files.find(f => f.id === fileId);
       if (file) setInspectedFile(file);
     }
@@ -131,6 +140,11 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
     }
   };
 
+  const handleFolderCreated = (folderDetails: { name: string; parent: string }) => {
+    setFolderPath(prev => [...prev, folderDetails.name]);
+    showToast(`Folder "${folderDetails.name}" created under ${folderDetails.parent}`);
+  };
+
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
@@ -138,6 +152,14 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
       onDrop={(e) => { e.preventDefault(); setIsDraggingOver(false); onUploadClick(); }}
       className="space-y-6 relative"
     >
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 bg-surface-container border border-accent-gold/40 text-gray-200 text-xs font-mono rounded-xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-200">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Drag-and-Drop Full Screen Glass Overlay */}
       {isDraggingOver && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center border-4 border-dashed border-accent-gold m-4 rounded-3xl animate-in fade-in duration-200">
@@ -181,10 +203,7 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
             <Upload className="w-4 h-4 text-accent-gold" /> Upload File
           </button>
           <button
-            onClick={() => {
-              const name = prompt('Enter new folder name:');
-              if (name) setFolderPath(prev => [...prev, name]);
-            }}
+            onClick={() => setShowCreateFolderModal(true)}
             className="px-4 py-2.5 bg-surface hover:bg-surface-card border border-stroke-default text-gray-200 hover:text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5"
           >
             <FolderPlus className="w-4 h-4 text-accent-gold" /> New Folder
@@ -192,7 +211,7 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
         </div>
       </div>
 
-      {/* Category Cards (Clicking opens dedicated subfolders) */}
+      {/* Category Cards */}
       {!currentFolder && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {systemFolders.map((folder, i) => {
@@ -220,7 +239,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
 
       {/* Sorting Dropdown & Advanced Filters Toolbar */}
       <div className="flex flex-col lg:flex-row gap-3 justify-between items-center bg-surface p-3 rounded-2xl border border-stroke-default">
-        {/* Search Bar */}
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-gray-400" />
           <input
@@ -232,9 +250,7 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
           />
         </div>
 
-        {/* Filter Chips & Sorting Dropdown */}
         <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto">
-          {/* Type Chips */}
           {['all', 'photos', 'videos', 'documents', 'archives'].map(chip => (
             <button
               key={chip}
@@ -249,7 +265,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
             </button>
           ))}
 
-          {/* Sorting Dropdown */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
@@ -264,7 +279,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
             <option value="recently-shared">Sort: Most Shared</option>
           </select>
 
-          {/* Grid vs Table Toggle */}
           <div className="flex items-center bg-surface-container p-1 rounded-xl border border-stroke-default shrink-0">
             <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition ${viewMode === 'grid' ? 'bg-surface-card text-accent-gold' : 'text-gray-400'}`}>
               <Grid className="w-4 h-4" />
@@ -289,16 +303,16 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 text-xs font-bold">
-            <button onClick={() => alert(`Bulk move ${selectedFileIds.length} files.`)} className="px-3 py-1.5 bg-surface hover:bg-surface-card border border-stroke-default rounded-lg text-gray-200 flex items-center gap-1">
+            <button onClick={() => showToast(`Bulk moved ${selectedFileIds.length} files.`)} className="px-3 py-1.5 bg-surface hover:bg-surface-card border border-stroke-default rounded-lg text-gray-200 flex items-center gap-1">
               <FolderInput className="w-3.5 h-3.5 text-accent-gold" /> Move
             </button>
-            <button onClick={() => alert(`Bulk share link created for ${selectedFileIds.length} files.`)} className="px-3 py-1.5 bg-primary/20 text-accent-gold border border-primary/30 rounded-lg flex items-center gap-1">
+            <button onClick={() => showToast(`Bulk share envelope created for ${selectedFileIds.length} files.`)} className="px-3 py-1.5 bg-primary/20 text-accent-gold border border-primary/30 rounded-lg flex items-center gap-1">
               <Share2 className="w-3.5 h-3.5" /> Share
             </button>
-            <button onClick={() => alert(`Bulk control policies applied.`)} className="px-3 py-1.5 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-lg flex items-center gap-1">
+            <button onClick={() => showToast(`Bulk security control policies applied.`)} className="px-3 py-1.5 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-lg flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" /> Control
             </button>
-            <button onClick={() => alert(`Downloading zip payload...`)} className="px-3 py-1.5 bg-surface hover:bg-surface-card border border-stroke-default rounded-lg text-gray-200 flex items-center gap-1">
+            <button onClick={() => showToast(`Preparing encrypted ZIP download...`)} className="px-3 py-1.5 bg-surface hover:bg-surface-card border border-stroke-default rounded-lg text-gray-200 flex items-center gap-1">
               <Download className="w-3.5 h-3.5 text-emerald-400" /> Download
             </button>
             <button onClick={() => { setSelectedFileIds([]); setInspectedFile(null); }} className="p-1.5 text-gray-400 hover:text-white">
@@ -308,10 +322,9 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
         </div>
       )}
 
-      {/* Main Body Layout: File Grid + Single-Click Details Inspector Side Panel */}
+      {/* Main Body Layout: File Grid + Details Inspector Panel */}
       <div className="flex gap-6 items-start">
         <div className="flex-1">
-          {/* Empty State Component */}
           {sortedFiles.length === 0 ? (
             <div className="glass-card rounded-2xl p-16 border border-stroke-default text-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-surface-card border border-stroke-default flex items-center justify-center mx-auto text-gray-500">
@@ -329,7 +342,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
               </button>
             </div>
           ) : viewMode === 'grid' ? (
-            /* File Cards Grid with View | Share | Control Buttons */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {sortedFiles.map(file => {
                 const isSelected = selectedFileIds.includes(file.id);
@@ -345,7 +357,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
                     }`}
                   >
                     <div>
-                      {/* Thumbnail Container */}
                       <div className="relative">
                         <FilePreviewRenderer
                           fileId={file.id}
@@ -356,14 +367,12 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
                           onOpen={() => onOpenViewer(file)}
                         />
 
-                        {/* Multi-select checkbox */}
                         <div className="absolute top-2 right-2 z-10">
                           <button onClick={(e) => toggleSelectFile(file.id, e)} className="p-0.5 rounded bg-black/60 backdrop-blur-sm">
                             {isSelected ? <CheckSquare className="w-4 h-4 text-accent-gold" /> : <Square className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition" />}
                           </button>
                         </div>
 
-                        {/* Shared Badge */}
                         {file.activeSharesCount !== undefined && file.activeSharesCount > 0 && (
                           <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/80 backdrop-blur-md border border-accent-gold/50 rounded-full text-[10px] font-bold text-accent-gold flex items-center gap-1">
                             <Share2 className="w-3 h-3 text-accent-gold" /> Shared ({file.activeSharesCount})
@@ -380,7 +389,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
                       </div>
                     </div>
 
-                    {/* Preserve 3 Direct Action Buttons: View | Share | Control */}
                     <div className="mt-4 pt-3 border-t border-stroke-default space-y-2">
                       <div className="grid grid-cols-3 gap-1.5 text-xs font-bold">
                         <button
@@ -413,7 +421,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
               })}
             </div>
           ) : (
-            /* Table View */
             <div className="glass-card rounded-2xl border border-stroke-default overflow-hidden">
               <table className="w-full text-left text-xs">
                 <thead className="bg-surface-container/90 border-b border-stroke-default text-gray-400 font-mono">
@@ -475,7 +482,6 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
           )}
         </div>
 
-        {/* Single-Click File Details Inspector Side Panel */}
         {inspectedFile && (
           <FileDetailsPanel
             file={inspectedFile}
@@ -486,6 +492,15 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
           />
         )}
       </div>
+
+      {/* Create Folder Modal */}
+      {showCreateFolderModal && (
+        <CreateFolderModal
+          parentFolder={currentFolder ? `My Files / ${currentFolder}` : 'My Files'}
+          onClose={() => setShowCreateFolderModal(false)}
+          onCreateFolder={handleFolderCreated}
+        />
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Folder, Eye, Share2, X } from 'lucide-react';
+import { CheckCircle2, Folder, Eye, Share2, X, Check } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
 
 interface UploadSuccessModalProps {
@@ -31,7 +31,7 @@ export const UploadSuccessModal: React.FC<UploadSuccessModalProps> = ({
 
         {/* Modal Header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-full bg-emerald-950/80 border-2 border-emerald-500/50 flex items-center justify-center mx-auto text-emerald-400">
+          <div className="w-12 h-12 rounded-full bg-emerald-950/80 border-2 border-emerald-500/50 flex items-center justify-center mx-auto text-emerald-400 shadow-lg">
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <h3 className="font-extrabold text-white text-base">File Encrypted & Saved Successfully</h3>
@@ -39,15 +39,15 @@ export const UploadSuccessModal: React.FC<UploadSuccessModalProps> = ({
         </div>
 
         {/* Saved Destination Indicator */}
-        <div className="p-3 bg-surface rounded-xl border border-stroke-default flex items-center justify-between text-xs">
-          <span className="text-gray-400 font-medium">Saved Location:</span>
+        <div className="p-3.5 bg-surface rounded-xl border border-stroke-default flex items-center justify-between text-xs">
+          <span className="text-gray-400 font-medium">Final Destination:</span>
           <span className="font-bold text-accent-gold flex items-center gap-1 font-mono">
             <Folder className="w-3.5 h-3.5" /> {destinationPath}
           </span>
         </div>
 
-        {/* 3 Action Buttons */}
-        <div className="grid grid-cols-3 gap-2 text-xs font-bold pt-2">
+        {/* 4 Action Buttons: Open Folder, View File, Share, Done */}
+        <div className="grid grid-cols-4 gap-2 text-xs font-bold pt-2">
           <button
             onClick={() => { onOpenFolder(destinationPath); onClose(); }}
             className="py-2.5 bg-surface hover:bg-surface-card border border-stroke-default rounded-xl text-gray-200 hover:text-white transition flex flex-col items-center justify-center gap-1"
@@ -61,7 +61,7 @@ export const UploadSuccessModal: React.FC<UploadSuccessModalProps> = ({
             className="py-2.5 bg-surface hover:bg-surface-card border border-stroke-default rounded-xl text-gray-200 hover:text-white transition flex flex-col items-center justify-center gap-1"
           >
             <Eye className="w-4 h-4 text-emerald-400" />
-            <span>View Stream</span>
+            <span>View File</span>
           </button>
 
           <button
@@ -69,7 +69,15 @@ export const UploadSuccessModal: React.FC<UploadSuccessModalProps> = ({
             className="py-2.5 bg-primary/20 hover:bg-primary/40 border border-primary/40 rounded-xl text-accent-gold transition flex flex-col items-center justify-center gap-1"
           >
             <Share2 className="w-4 h-4 text-accent-gold" />
-            <span>Share File</span>
+            <span>Share</span>
+          </button>
+
+          <button
+            onClick={onClose}
+            className="py-2.5 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-xl text-emerald-400 transition flex flex-col items-center justify-center gap-1"
+          >
+            <Check className="w-4 h-4" />
+            <span>Done</span>
           </button>
         </div>
       </div>
