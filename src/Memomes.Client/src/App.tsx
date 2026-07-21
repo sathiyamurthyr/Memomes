@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AuthScreen } from './components/AuthScreen';
-import { Dashboard } from './components/Dashboard';
+import { DashboardV2 } from './components/DashboardV2';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<{ email: string; masterKey: CryptoKey; shards: any } | null>(null);
@@ -10,14 +10,13 @@ function App() {
   };
 
   const handleLogout = () => {
-    // Flush local RAM keys
     setCurrentUser(null);
   };
 
   return (
     <div className="min-h-screen bg-surface selection:bg-primary selection:text-white">
       {currentUser ? (
-        <Dashboard userEmail={currentUser.email} onLogout={handleLogout} />
+        <DashboardV2 userEmail={currentUser.email} onLogout={handleLogout} />
       ) : (
         <AuthScreen onLoginSuccess={handleLoginSuccess} />
       )}
