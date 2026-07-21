@@ -161,12 +161,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
     if (!pendingFiles) return;
     const pathLabel = destination === 'digital-vault' ? 'Digital Vault' : `My Files / ${folderName}`;
     setLastUploadedPath(pathLabel);
-
-    if (destination === 'digital-vault') {
-      uploadPipelineRef.current?.addFiles(pendingFiles);
-    } else {
-      uploadPipelineRef.current?.addFiles(pendingFiles);
-    }
+    uploadPipelineRef.current?.addFiles(pendingFiles);
     setPendingFiles(null);
   };
 
@@ -191,8 +186,15 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         return (
           <DashboardPage
             files={files}
+            onUploadClick={() => document.getElementById('main-file-input')?.click()}
             onNavigateToMyFiles={() => setActiveSection('my-files')}
+            onOpenVault={() => setActiveSection('digital-vault')}
+            onNearbyShare={() => setShowOfflineP2P(true)}
+            onAISearchFocus={() => setActiveSection('ai-search')}
+            onRequestFiles={() => alert('Dropbox link created.')}
+            onOpenViewer={(f) => setViewingFile(f)}
             onOpenShareModal={(f) => setShareModalFile(f)}
+            onOpenControlCenter={(f) => setControlCenterFile(f)}
           />
         );
       case 'my-files':
