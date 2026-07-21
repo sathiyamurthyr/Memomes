@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ShieldCheck, Search, Upload, Lock, Trash2, Video, FileText,
+  ShieldCheck, Search, Upload, Lock, Trash2, Video, FileText, LogOut,
   Archive, RefreshCw, Eye, Download, Wifi, Zap, Sparkles, HardDrive
 } from 'lucide-react';
 import { PanicLockButton } from './PanicLockButton';
@@ -25,9 +25,13 @@ export interface FileItem {
   createdAt: string;
 }
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+  userEmail: string;
+  onLogout: () => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ userEmail, onLogout }) => {
   const [userId] = useState<string>('a1b2c3d4-e5f6-7890-abcd-1234567890ab');
-  const [userEmail] = useState<string>('user@memomes.com');
   const [userIp] = useState<string>('103.21.124.5');
 
   const [files, setFiles] = useState<FileItem[]>([
@@ -198,7 +202,7 @@ export const Dashboard: React.FC = () => {
           </div>
           <div>
             <h1 className="text-base font-extrabold text-white tracking-wide">Memomes Cloud</h1>
-            <p className="text-[11px] text-gray-400 font-mono">Zero-Knowledge Encrypted Vault</p>
+            <p className="text-[11px] text-gray-400 font-mono">Logged in as {userEmail}</p>
           </div>
         </div>
 
@@ -229,7 +233,17 @@ export const Dashboard: React.FC = () => {
           </button>
 
           {/* Panic Lock Emergency Button */}
-          <PanicLockButton userId={userId} onLockComplete={() => alert("Vault Locked. Refresh page to re-authenticate.")} />
+          <PanicLockButton userId={userId} onLockComplete={onLogout} />
+
+          {/* Sign Out Button */}
+          <button
+            onClick={onLogout}
+            className="flex items-center space-x-1 px-3 py-1.5 bg-surface-card hover:bg-surface-hover text-gray-300 hover:text-white border border-stroke-default rounded-lg text-xs font-bold transition"
+            title="Sign out of Zero-Knowledge vault"
+          >
+            <LogOut className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden sm:inline">Sign Out</span>
+          </button>
         </div>
       </header>
 
