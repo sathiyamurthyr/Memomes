@@ -3,6 +3,7 @@ import {
   Share2, Lock, KeyRound, Clock, Flame, Eye, Copy, Check, QrCode, Shield, Sparkles, X
 } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
+import { getAppBaseUrl } from '../utils/urlHelper';
 
 interface SecureShareModalProps {
   file: FileItem;
@@ -28,7 +29,8 @@ export const SecureShareModal: React.FC<SecureShareModalProps> = ({
   const [showQr, setShowQr] = useState(false);
 
   const handleGenerateShare = () => {
-    const link = `https://memomes.cloud/s/${file.id}?tier=${accessTier}&expiry=${expiryOption}&zk=1`;
+    const baseUrl = getAppBaseUrl();
+    const link = `${baseUrl}/s/${file.id}?tier=${accessTier}&expiry=${expiryOption}&zk=1`;
     setGeneratedLink(link);
     if (onShareCreated) {
       onShareCreated({

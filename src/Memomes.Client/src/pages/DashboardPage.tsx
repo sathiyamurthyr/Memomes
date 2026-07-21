@@ -2,15 +2,28 @@ import React from 'react';
 import { SecurityPanelV2 } from '../components/SecurityPanelV2';
 import { RecentActivityTimeline } from '../components/RecentActivityTimeline';
 import { SharingAnalytics } from '../components/SharingAnalytics';
-import { HardDrive, ShieldCheck, TrendingUp, Link } from 'lucide-react';
+import { HardDrive, ShieldCheck, TrendingUp, Link, Upload } from 'lucide-react';
+import type { FileItem } from '../components/DashboardV2';
 
-export const DashboardPage: React.FC = () => {
+interface DashboardPageProps {
+  files: FileItem[];
+  onNavigateToMyFiles: () => void;
+  onOpenShareModal: (file: FileItem) => void;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({
+  files,
+  onNavigateToMyFiles,
+  onOpenShareModal
+}) => {
+  const recentUploads = files.slice(0, 3);
+
   return (
     <div className="space-y-8">
-      {/* KPI Summary Row */}
+      {/* KPI Summary Header Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Files Stored', value: '312', icon: HardDrive, color: 'text-accent-gold' },
+          { label: 'Files Stored', value: `${files.length}`, icon: HardDrive, color: 'text-accent-gold' },
           { label: 'Security Score', value: '98/100', icon: ShieldCheck, color: 'text-emerald-400' },
           { label: 'Active Shares', value: '8', icon: Link, color: 'text-accent-blue' },
           { label: 'Storage Used', value: '1.05 GB', icon: TrendingUp, color: 'text-purple-400' },
@@ -28,7 +41,7 @@ export const DashboardPage: React.FC = () => {
         })}
       </div>
 
-      {/* Storage & Security Row */}
+      {/* Storage Allocation & Security Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 glass-card rounded-2xl p-6 border border-stroke-default">
           <h3 className="font-bold text-gray-100 text-sm flex items-center gap-2 mb-4">
@@ -56,6 +69,38 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
         <SecurityPanelV2 />
+      </div>
+
+      {/* Recent Uploads Summary Widget */}
+      <div className="glass-card rounded-2xl p-6 border border-stroke-default">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-100 text-sm flex items-center gap-2">
+            <Upload className="w-4 h-4 text-accent-gold" /> Recent Uploads Summary
+          </h3>
+          <button
+            onClick={onNavigateToMyFiles}
+            className="text-xs text-accent-gold hover:underline font-bold"
+          >
+            View All in My Files →
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          {recentUploads.map(f => (
+            <div key={f.id} className="p-3.5 bg-surface rounded-xl border border-stroke-default flex items-center justify-between">
+              <div className="truncate pr-2">
+                <span className="font-bold text-gray-200 block truncate">{f.fileNameEncrypted}</span>
+                <span className="text-[10px] text-gray-400 font-mono">{(f.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
+              </div>
+              <button
+                onClick={() => onOpenShareModal(f)}
+                className="px-2.5 py-1 bg-primary/20 text-accent-gold hover:bg-primary/40 border border-primary/30 font-bold rounded-lg transition shrink-0"
+              >
+                Share
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Sharing & Activity Row */}

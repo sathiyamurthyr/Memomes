@@ -1,26 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Search, LogOut, Video, FileText, RefreshCw, Wifi, Zap, Sparkles,
-  Grid, List, ArrowUpDown, MoreVertical, Bell, Star, Eye, Share2, ShieldCheck
+  LogOut, Wifi, Zap, Bell
 } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Breadcrumbs } from './Breadcrumbs';
-import { FilePreviewRenderer } from './FilePreviewRenderer';
-import { QuickActions } from './QuickActions';
 import { FileContextMenu } from './FileContextMenu';
 import { UploadQueueDrawer } from './UploadQueueDrawer';
 import { PanicLockButton } from './PanicLockButton';
-import { AIOnboardingBanner } from './AIOnboardingBanner';
 import { WatermarkedViewer } from './WatermarkedViewer';
 import { OfflineP2PSync } from './OfflineP2PSync';
 import { PricingModal } from './PricingModal';
 import { AccountPurgeModal } from './AccountPurgeModal';
 import { SecureShareModal } from './SecureShareModal';
 import { FileControlCenterModal } from './FileControlCenterModal';
+import { UploadDestinationModal } from './UploadDestinationModal';
+import { UploadSuccessModal } from './UploadSuccessModal';
 import { UploadPipelineManager, type UploadQueueItem } from '../services/uploadPipeline';
 
 // Section Pages
 import { DashboardPage } from '../pages/DashboardPage';
+import { MyFilesPage } from '../pages/MyFilesPage';
 import { SecureSharesPage } from '../pages/SecureSharesPage';
 import { DigitalVaultPage } from '../pages/DigitalVaultPage';
 import { SharedWithMePage } from '../pages/SharedWithMePage';
@@ -60,13 +59,14 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('dashboard');
 
-  // "My Files" state
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  const [sortColumn, setSortColumn] = useState<'name' | 'size' | 'date' | 'type'>('date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [activeFilter, setActiveFilter] = useState<string>('all');
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([]);
   const uploadPipelineRef = useRef<UploadPipelineManager | null>(null);
+
+  // Upload Destination & Success Modals State
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+  const [showDestinationModal, setShowDestinationModal] = useState(false);
+  const [lastUploadedFile, setLastUploadedFile] = useState<FileItem | null>(null);
+  const [lastUploadedPath, setLastUploadedPath] = useState('My Files / Photos');
 
   const [files, setFiles] = useState<FileItem[]>([
     {
@@ -134,11 +134,8 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   const [contextMenu, setContextMenu] = useState<{ file: FileItem; x: number; y: number } | null>(null);
   const [shareModalFile, setShareModalFile] = useState<FileItem | null>(null);
   const [controlCenterFile, setControlCenterFile] = useState<FileItem | null>(null);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchLatencyMs, setSearchLatencyMs] = useState<number | null>(null);
   const [viewingFile, setViewingFile] = useState<FileItem | null>(null);
+
   const [showOfflineP2P, setShowOfflineP2P] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const [showPurgeModal, setShowPurgeModal] = useState(false);
@@ -146,6 +143,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   useEffect(() => {
     uploadPipelineRef.current = new UploadPipelineManager((newFile) => {
       setFiles(prev => [newFile, ...prev]);
+      setLastUploadedFile(newFile);
     });
     const unsubscribe = uploadPipelineRef.current.subscribe(queue => {
       setUploadQueue(queue);
@@ -153,58 +151,32 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
     return () => unsubscribe();
   }, []);
 
-  const filterChips = [
-    { id: 'all', label: 'All Files' },
-    { id: 'photos', label: 'Photos' },
-    { id: 'videos', label: 'Videos' },
-    { id: 'documents', label: 'Documents' },
-    { id: 'archives', label: 'Archives' },
-  ];
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    uploadPipelineRef.current?.addFiles(e.target.files);
+    setPendingFiles(e.target.files);
+    setShowDestinationModal(true);
+  };
+
+  const handleConfirmDestination = (destination: string, folderName: string) => {
+    if (!pendingFiles) return;
+    const pathLabel = destination === 'digital-vault' ? 'Digital Vault' : `My Files / ${folderName}`;
+    setLastUploadedPath(pathLabel);
+
+    if (destination === 'digital-vault') {
+      uploadPipelineRef.current?.addFiles(pendingFiles);
+    } else {
+      uploadPipelineRef.current?.addFiles(pendingFiles);
+    }
+    setPendingFiles(null);
   };
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files?.length > 0) {
-      uploadPipelineRef.current?.addFiles(e.dataTransfer.files);
+      setPendingFiles(e.dataTransfer.files);
+      setShowDestinationModal(true);
     }
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    const start = performance.now();
-    const dummyVector512 = new Array(512).fill(0).map(() => (Math.random() - 0.5));
-    try {
-      const res = await fetch('/api/embeddings/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, queryVector512: dummyVector512, limit: 5 })
-      });
-      setSearchLatencyMs(res.ok ? (await res.json()).searchLatencyMs : performance.now() - start);
-    } catch {
-      setSearchLatencyMs(performance.now() - start);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const sortedFiles = [...files].sort((a, b) => {
-    let cmp = 0;
-    if (sortColumn === 'name') cmp = a.fileNameEncrypted.localeCompare(b.fileNameEncrypted);
-    else if (sortColumn === 'size') cmp = a.sizeBytes - b.sizeBytes;
-    else if (sortColumn === 'date') cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    else if (sortColumn === 'type') cmp = a.contentTypeEncrypted.localeCompare(b.contentTypeEncrypted);
-    return sortDirection === 'asc' ? cmp : -cmp;
-  });
-
-  const toggleSort = (col: 'name' | 'size' | 'date' | 'type') => {
-    if (sortColumn === col) setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    else { setSortColumn(col); setSortDirection('asc'); }
   };
 
   const handleContextMenu = (e: React.MouseEvent, file: FileItem) => {
@@ -215,7 +187,24 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   // Section Page Router
   const renderSectionPage = () => {
     switch (activeSection) {
-      case 'dashboard': return <DashboardPage />;
+      case 'dashboard':
+        return (
+          <DashboardPage
+            files={files}
+            onNavigateToMyFiles={() => setActiveSection('my-files')}
+            onOpenShareModal={(f) => setShareModalFile(f)}
+          />
+        );
+      case 'my-files':
+        return (
+          <MyFilesPage
+            files={files}
+            onOpenViewer={(f) => setViewingFile(f)}
+            onOpenShareModal={(f) => setShareModalFile(f)}
+            onOpenControlCenter={(f) => setControlCenterFile(f)}
+            onContextMenu={handleContextMenu}
+          />
+        );
       case 'secure-shares': return <SecureSharesPage />;
       case 'digital-vault': return <DigitalVaultPage />;
       case 'shared-with-me': return <SharedWithMePage />;
@@ -274,219 +263,32 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
 
         <main className="max-w-7xl mx-auto px-6 pt-6 pb-16">
           <Breadcrumbs sectionId={activeSection} onNavigateHome={() => setActiveSection('dashboard')} />
-
-          {sectionContent ? (
-            sectionContent
-          ) : (
-            /* My Files Section */
-            <>
-              <AIOnboardingBanner progress={100} isIndexing={false} />
-              <QuickActions
-                onUploadClick={() => document.getElementById('main-file-input')?.click()}
-                onOpenVault={() => setActiveSection('digital-vault')}
-                onNearbyShare={() => setShowOfflineP2P(true)}
-                onAISearch={() => setActiveSection('ai-search')}
-                onRequestFiles={() => alert('Dropbox link created.')}
-              />
-              <input id="main-file-input" type="file" multiple onChange={handleFileUpload} className="hidden" />
-
-              {/* AI Search Bar */}
-              <div className="glass-card rounded-2xl p-4 mb-6 border border-stroke-default">
-                <div className="flex gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3.5 top-3 w-4 h-4 text-gray-400" />
-                    <input
-                      id="ai-search-input"
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      placeholder='Natural language: "Show me family photos from Goa", "Find passport"...'
-                      className="w-full bg-surface border border-stroke-default rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-accent-gold"
-                    />
-                  </div>
-                  <button
-                    onClick={handleSearch}
-                    disabled={isSearching}
-                    className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition flex items-center gap-2"
-                  >
-                    {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-accent-gold" />}
-                    Sub-5ms AI Search
-                  </button>
-                </div>
-                {searchLatencyMs !== null && (
-                  <div className="mt-2 text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 px-2">
-                    <Zap className="w-3 h-3 text-accent-gold" />
-                    pgvector query: {searchLatencyMs.toFixed(2)} ms
-                  </div>
-                )}
-              </div>
-
-              {/* Filter Chips & View Toggle */}
-              <div className="flex items-center justify-between gap-4 mb-6 overflow-x-auto pb-2">
-                <div className="flex items-center space-x-2">
-                  {filterChips.map(chip => (
-                    <button
-                      key={chip.id}
-                      onClick={() => setActiveFilter(chip.id)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-xl whitespace-nowrap transition ${activeFilter === chip.id ? 'bg-primary text-white border border-red-500/40 shadow-sm' : 'bg-surface-container text-gray-400 hover:text-white border border-stroke-default'}`}
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center bg-surface p-1 rounded-xl border border-stroke-default shrink-0">
-                  <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition ${viewMode === 'grid' ? 'bg-surface-card text-accent-gold' : 'text-gray-400'}`} title="Grid View">
-                    <Grid className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-lg transition ${viewMode === 'table' ? 'bg-surface-card text-accent-gold' : 'text-gray-400'}`} title="Table View">
-                    <List className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* File Grid with 3 Direct Actions: View, Share, Control */}
-              {viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                  {sortedFiles.map(file => (
-                    <div
-                      key={file.id}
-                      onContextMenu={(e) => handleContextMenu(e, file)}
-                      className="glass-card rounded-xl p-4 border border-stroke-default flex flex-col justify-between group hover:border-primary/60 transition relative"
-                    >
-                      <div>
-                        {/* Real File Preview Container */}
-                        <div className="relative">
-                          <FilePreviewRenderer
-                            fileId={file.id}
-                            fileName={file.fileNameEncrypted}
-                            contentType={file.contentTypeEncrypted}
-                            thumbnailUrl={file.thumbnailUrl}
-                            sizeBytes={file.sizeBytes}
-                            onOpen={() => setViewingFile(file)}
-                          />
-
-                          {/* Shared Badge showing active recipient count */}
-                          {file.activeSharesCount !== undefined && file.activeSharesCount > 0 && (
-                            <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/80 backdrop-blur-md border border-accent-gold/50 rounded-full text-[10px] font-bold text-accent-gold flex items-center gap-1">
-                              <Share2 className="w-3 h-3 text-accent-gold" /> Shared ({file.activeSharesCount})
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mt-3 flex items-start justify-between">
-                          <h4 className="font-semibold text-gray-100 text-xs truncate flex-1 pr-2" title={file.fileNameEncrypted}>
-                            {file.fileNameEncrypted}
-                          </h4>
-                          {file.isFavorite && <Star className="w-3.5 h-3.5 text-accent-gold fill-accent-gold shrink-0" />}
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mt-1">
-                          <span>{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
-                          <span>{new Date(file.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-
-                      {/* 3 Prominent Primary Action Buttons: View, Share, Control + Secondary Menu */}
-                      <div className="mt-4 pt-3 border-t border-stroke-default space-y-2">
-                        <div className="grid grid-cols-3 gap-1.5 text-xs font-bold">
-                          {/* 1. View Button */}
-                          <button
-                            onClick={() => setViewingFile(file)}
-                            className="py-1.5 px-2 bg-surface hover:bg-surface-card border border-stroke-default rounded-lg text-gray-200 hover:text-white transition flex items-center justify-center gap-1"
-                            title="Open / View Stream"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-accent-gold" /> View
-                          </button>
-
-                          {/* 2. Share Button */}
-                          <button
-                            onClick={() => setShareModalFile(file)}
-                            className="py-1.5 px-2 bg-primary/20 hover:bg-primary/40 border border-primary/40 rounded-lg text-accent-gold transition flex items-center justify-center gap-1"
-                            title="Create Secure Share Link"
-                          >
-                            <Share2 className="w-3.5 h-3.5 text-accent-gold" /> Share
-                          </button>
-
-                          {/* 3. Control Button */}
-                          <button
-                            onClick={() => setControlCenterFile(file)}
-                            className="py-1.5 px-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 rounded-lg text-amber-300 transition flex items-center justify-center gap-1"
-                            title="Manage Shares & Revoke Access"
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5 text-accent-gold" /> Control
-                          </button>
-                        </div>
-
-                        <div className="flex justify-end pt-1">
-                          <button
-                            onClick={(e) => handleContextMenu(e, file)}
-                            className="p-1 text-gray-400 hover:text-white flex items-center gap-1 text-[11px]"
-                            title="More Actions (Rename, Move, Copy, Delete)"
-                          >
-                            <MoreVertical className="w-3.5 h-3.5" /> <span className="text-[10px]">More</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                /* Tabular List View with Direct Actions */
-                <div className="glass-card rounded-2xl border border-stroke-default overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-surface-container/90 border-b border-stroke-default text-gray-400 font-mono">
-                      <tr>
-                        <th onClick={() => toggleSort('name')} className="p-3.5 cursor-pointer hover:text-white"><div className="flex items-center gap-1">Name <ArrowUpDown className="w-3 h-3" /></div></th>
-                        <th onClick={() => toggleSort('type')} className="p-3.5 cursor-pointer hover:text-white"><div className="flex items-center gap-1">Type <ArrowUpDown className="w-3 h-3" /></div></th>
-                        <th onClick={() => toggleSort('size')} className="p-3.5 cursor-pointer hover:text-white"><div className="flex items-center gap-1">Size <ArrowUpDown className="w-3 h-3" /></div></th>
-                        <th className="p-3.5">Sharing Status</th>
-                        <th className="p-3.5 text-right">Primary Actions</th>
-                        <th className="p-3.5 text-right">More</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stroke-default">
-                      {sortedFiles.map(file => (
-                        <tr key={file.id} onContextMenu={(e) => handleContextMenu(e, file)} className="hover:bg-surface-card transition">
-                          <td className="p-3.5 font-semibold text-gray-200">
-                            <div className="flex items-center gap-2">
-                              {file.contentTypeEncrypted.includes('video') ? <Video className="w-4 h-4 text-primary shrink-0" /> : <FileText className="w-4 h-4 text-accent-blue shrink-0" />}
-                              <span className="truncate max-w-[180px]">{file.fileNameEncrypted}</span>
-                            </div>
-                          </td>
-                          <td className="p-3.5 text-gray-400 font-mono text-[10px]">{file.contentTypeEncrypted.split('/')[1]?.toUpperCase()}</td>
-                          <td className="p-3.5 text-gray-300 font-mono">{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</td>
-                          <td className="p-3.5">
-                            {file.activeSharesCount && file.activeSharesCount > 0 ? (
-                              <span className="px-2 py-0.5 bg-amber-950/60 text-accent-gold border border-amber-500/30 rounded-full text-[10px] font-bold">
-                                Shared ({file.activeSharesCount})
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 bg-surface text-gray-400 border border-stroke-default rounded-full text-[10px]">
-                                Private
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3.5 text-right">
-                            <div className="flex items-center justify-end gap-1 font-bold">
-                              <button onClick={() => setViewingFile(file)} className="px-2 py-1 bg-surface hover:bg-surface-card text-gray-300 hover:text-white border border-stroke-default rounded text-[11px]">View</button>
-                              <button onClick={() => setShareModalFile(file)} className="px-2 py-1 bg-primary/20 text-accent-gold hover:bg-primary/40 border border-primary/30 rounded text-[11px]">Share</button>
-                              <button onClick={() => setControlCenterFile(file)} className="px-2 py-1 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 rounded text-[11px]">Control</button>
-                            </div>
-                          </td>
-                          <td className="p-3.5 text-right">
-                            <button onClick={(e) => handleContextMenu(e, file)} className="p-1 text-gray-400 hover:text-white"><MoreVertical className="w-4 h-4" /></button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
+          {sectionContent}
         </main>
       </div>
+
+      {/* Hidden File Input */}
+      <input id="main-file-input" type="file" multiple onChange={handleFileInputChange} className="hidden" />
+
+      {/* Upload Destination Selector Modal */}
+      {showDestinationModal && (
+        <UploadDestinationModal
+          onConfirmDestination={handleConfirmDestination}
+          onClose={() => setShowDestinationModal(false)}
+        />
+      )}
+
+      {/* Upload Confirmation Success Dialog */}
+      {lastUploadedFile && (
+        <UploadSuccessModal
+          file={lastUploadedFile}
+          destinationPath={lastUploadedPath}
+          onClose={() => setLastUploadedFile(null)}
+          onOpenFolder={() => setActiveSection('my-files')}
+          onViewFile={(f) => setViewingFile(f)}
+          onShareFile={(f) => setShareModalFile(f)}
+        />
+      )}
 
       {/* Global Modals & Overlays */}
       <UploadQueueDrawer
@@ -505,7 +307,6 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         />
       )}
 
-      {/* Dedicated Secure Share Modal */}
       {shareModalFile && (
         <SecureShareModal
           file={shareModalFile}
@@ -516,7 +317,6 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         />
       )}
 
-      {/* Dedicated File Control Center Modal */}
       {controlCenterFile && (
         <FileControlCenterModal
           file={controlCenterFile}
