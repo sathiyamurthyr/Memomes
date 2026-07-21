@@ -14,6 +14,7 @@ public static class FilesEndpoints
         group.MapPost("/presigned-chunk-url", GetPresignedChunkUrlAsync);
         group.MapPost("/complete-upload", CompleteUploadAsync);
         group.MapGet("/{id:guid}/presigned-download", GetPresignedDownloadUrlAsync);
+        group.MapGet("/{id:guid}/preview", GetFilePreviewAsync);
         group.MapGet("/list", ListFilesAsync);
         group.MapDelete("/{id:guid}/trash", SoftDeleteFileAsync);
         group.MapPost("/{id:guid}/restore", RestoreFileAsync);
@@ -53,9 +54,14 @@ public static class FilesEndpoints
         AppDbContext db,
         IS3StorageService s3Storage,
         IAuditLoggerService auditLogger,
+        IPreviewGeneratorService previewGenerator,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
+
+        // Generate backend cached preview
+        var fileId = Guid.NewGuid();
+        await previewGenerator.GenerateAndCachePreviewAsync(fileId, input.FileNameEncrypted, input.ContentTypeEncrypted, null);
 
         // Client-Side Zero-Knowledge Deduplication Check
         var existingFile = await db.StoredFiles
@@ -63,7 +69,6 @@ public static class FilesEndpoints
 
         if (existingFile != null)
         {
-            // Link metadata to existing blob without re-uploading file bytes
             var deduplicatedFile = new StoredFile
             {
                 UserId = input.UserId,
@@ -90,12 +95,11 @@ public static class FilesEndpoints
             });
         }
 
-        var newFileId = Guid.NewGuid();
-        var storagePath = $"vault/{input.UserId}/{newFileId}.bin";
+        var storagePath = $"vault/{input.UserId}/{fileId}.bin";
 
         var newFile = new StoredFile
         {
-            Id = newFileId,
+            Id = fileId,
             UserId = input.UserId,
             FileNameEncrypted = input.FileNameEncrypted,
             ContentTypeEncrypted = input.ContentTypeEncrypted,
@@ -109,7 +113,7 @@ public static class FilesEndpoints
         db.StoredFiles.Add(newFile);
         await db.SaveChangesAsync();
 
-        if (input.SizeBytes > 100 * 1024 * 1024) // > 100 MB -> Multipart Chunking
+        if (input.SizeBytes > 100 * 1024 * 1024)
         {
             var uploadId = await s3Storage.InitiateMultipartUploadAsync(storagePath, input.ContentTypeEncrypted);
             await auditLogger.LogAccessAsync(newFile.Id, input.UserId, "INIT_MULTIPART_UPLOAD", context, sw);
@@ -124,7 +128,6 @@ public static class FilesEndpoints
             });
         }
 
-        // Single presigned URL (strictly 60-second expiration)
         var presignedUploadUrl = s3Storage.GeneratePresignedUploadUrl(storagePath, input.ContentTypeEncrypted, 60);
 
         await auditLogger.LogAccessAsync(newFile.Id, input.UserId, "INIT_SINGLE_UPLOAD", context, sw);
@@ -137,6 +140,22 @@ public static class FilesEndpoints
             PresignedUploadUrl = presignedUploadUrl,
             StoragePath = storagePath
         });
+    }
+
+    private static async Task<IResult> GetFilePreviewAsync(
+        Guid id,
+        IPreviewGeneratorService previewGenerator,
+        HttpContext context)
+    {
+        var previewBytes = await previewGenerator.GetCachedPreviewAsync(id);
+        if (previewBytes == null)
+        {
+            var defaultSvg = "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='#10141F'/><text x='100' y='100' fill='#FFC928' font-size='12' text-anchor='middle'>Preview Ready</text></svg>";
+            previewBytes = System.Text.Encoding.UTF8.GetBytes(defaultSvg);
+        }
+
+        context.Response.Headers.Append("Cache-Control", "public, max-age=31536000");
+        return Results.Bytes(previewBytes, contentType: "image/svg+xml");
     }
 
     private static async Task<IResult> GetPresignedChunkUrlAsync(
@@ -191,15 +210,13 @@ public static class FilesEndpoints
         var file = await db.StoredFiles.FindAsync(id);
         if (file == null || file.IsTrash) return Results.NotFound(new { Error = "File not found or deleted" });
 
-        // Update last accessed time
         file.LastAccessedAt = DateTime.UtcNow;
         if (file.IsColdStorage)
         {
-            file.IsColdStorage = false; // Re-hydrate file from cold storage
+            file.IsColdStorage = false;
         }
         await db.SaveChangesAsync();
 
-        // 60-second expiration strictly enforced
         var presignedUrl = s3Storage.GeneratePresignedDownloadUrl(file.StoragePath, 60);
 
         await auditLogger.LogAccessAsync(file.Id, userId, "PRESIGN_DOWNLOAD", context, sw);

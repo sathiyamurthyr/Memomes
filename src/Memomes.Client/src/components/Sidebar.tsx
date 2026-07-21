@@ -26,7 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'shared-by-me', label: 'Shared By Me', icon: Share2 },
     { id: 'favorites', label: 'Favorites', icon: Star },
     { id: 'recent', label: 'Recent', icon: Clock },
-    { id: 'trash', label: 'Trash', icon: Trash2 },
+    { id: 'trash', label: 'Vault Trash', icon: Trash2 },
     { id: 'activity', label: 'Activity Log', icon: Activity },
     { id: 'ai-search', label: 'AI Search', icon: Sparkles },
     { id: 'nearby-share', label: 'Nearby Share', icon: Wifi },
@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Lock className="w-4 h-4 text-accent-gold" />
                 </div>
               </div>
-              <span className="font-extrabold text-white text-sm tracking-wide">Memomes</span>
+              <span className="font-extrabold text-white text-sm tracking-wide">Memomes Cloud</span>
             </div>
           )}
 
@@ -99,9 +99,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 border-t border-stroke-default space-y-1">
         <button
           onClick={() => onSelectSection('settings')}
-          className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-medium text-gray-400 hover:text-white hover:bg-surface-card rounded-xl ${
-            isCollapsed ? 'justify-center px-0' : ''
-          }`}
+          className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-medium ${
+            activeSection === 'settings' ? 'text-accent-gold font-bold bg-primary/20 rounded-xl' : 'text-gray-400 hover:text-white hover:bg-surface-card rounded-xl'
+          } ${isCollapsed ? 'justify-center px-0' : ''}`}
         >
           <Settings className="w-4 h-4 shrink-0" />
           {!isCollapsed && <span>Settings</span>}

@@ -17,9 +17,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, o => o.UseVector());
 });
 
-// Storage Service & Audit Logger
+// Storage Service, Audit Logger & Preview Generator
 builder.Services.AddSingleton<IS3StorageService, S3StorageService>();
 builder.Services.AddScoped<IAuditLoggerService, AuditLoggerService>();
+builder.Services.AddSingleton<IPreviewGeneratorService, PreviewGeneratorService>();
 
 // Cold Storage Archiver Worker
 builder.Services.AddHostedService<ColdStorageArchiverWorker>();
@@ -29,7 +30,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowClient", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://localhost:3001")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
