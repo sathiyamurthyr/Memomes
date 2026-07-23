@@ -1,0 +1,1 @@
+# Memomes Storage Package Init

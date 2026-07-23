@@ -19,6 +19,39 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: memomes-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2024-07-16T22-04-45Z
+    container_name: memomes-minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_secure_password_123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: .
@@ -30,15 +63,37 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=db;Database=memomes;Username=memomes_user;Password=memomes_secure_password_123
-      - AWS__ServiceURL=https://s3.us-west-004.backblazeb2.com
-      - AWS__AccessKeyId=mock_b2_access_key
-      - AWS__SecretAccessKey=mock_b2_secret_key
-      - AWS__BucketName=memomes-vault-bucket
-      - AWS__Region=us-west-004
+      - AWS__ServiceURL=http://minio:9000
+      - AWS__AccessKeyId=minio_admin
+      - AWS__SecretAccessKey=minio_secure_password_123
+      - AWS__BucketName=memomes
+      - AWS__Region=us-east-1
       - JWT__SecretKey=MemomesZeroKnowledgeSuperSecretKey2026SecureVault!
     depends_on:
       db:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  storage-api:
+    build:
+      context: .
+      dockerfile: src/Memomes.Storage/Dockerfile
+    container_name: memomes-storage-api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV_FILE=/app/.env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
 volumes:
   pgdata:
+  redisdata:
+  miniodata:
