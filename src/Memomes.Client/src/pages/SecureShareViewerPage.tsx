@@ -109,6 +109,7 @@ export const SecureShareViewerPage: React.FC = () => {
     };
 
     // 2. devtools & print keyboard shortcuts blocker
+    // 2. devtools & print keyboard shortcuts blocker
     const handleKeyDown = (e: KeyboardEvent) => {
       // F12
       if (e.key === 'F12') {
@@ -136,15 +137,27 @@ export const SecureShareViewerPage: React.FC = () => {
         return;
       }
 
-      // PrintScreen Key / Snapshot key
-      if (e.key === 'PrintScreen' || e.key === 'Snapshot') {
+      // PrintScreen Key / Snapshot key (keydown)
+      if (e.key === 'PrintScreen' || e.key === 'Snapshot' || e.keyCode === 44) {
         e.preventDefault();
         setIsScreenHidden(true);
-        setTimeout(() => setIsScreenHidden(false), 2000);
+        // Scramble clipboard buffer
+        navigator.clipboard.writeText('Memomes Security: Screen Capture Blocked!').catch(() => {});
+        setTimeout(() => setIsScreenHidden(false), 3000);
       }
     };
 
-    // 3. Screen Capture Shield (Blur/Visibility check)
+    // Chrome/OS fires PrintScreen on keyup instead of keydown
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'PrintScreen' || e.key === 'Snapshot' || e.keyCode === 44) {
+        e.preventDefault();
+        setIsScreenHidden(true);
+        navigator.clipboard.writeText('Memomes Security: Screen Capture Blocked!').catch(() => {});
+        setTimeout(() => setIsScreenHidden(false), 3000);
+      }
+    };
+
+    // 3. Screen Capture Shield (Blur/Visibility check & Cursor hover track)
     const handleFocusLoss = () => {
       setIsScreenHidden(true);
     };
@@ -168,10 +181,16 @@ export const SecureShareViewerPage: React.FC = () => {
     document.addEventListener('copy', preventActions);
     document.addEventListener('selectstart', preventActions);
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     
     // Listen to focus/blur to shield against snipping tools
     window.addEventListener('blur', handleFocusLoss);
     window.addEventListener('focus', handleFocusGain);
+    
+    // Shield against snipping tool area selections by hiding the image when mouse leaves the tab viewport
+    document.addEventListener('mouseleave', handleFocusLoss);
+    document.addEventListener('mouseenter', handleFocusGain);
+    
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) handleFocusLoss();
       else handleFocusGain();
@@ -182,8 +201,11 @@ export const SecureShareViewerPage: React.FC = () => {
       document.removeEventListener('copy', preventActions);
       document.removeEventListener('selectstart', preventActions);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleFocusLoss);
       window.removeEventListener('focus', handleFocusGain);
+      document.removeEventListener('mouseleave', handleFocusLoss);
+      document.removeEventListener('mouseenter', handleFocusGain);
       
       const el = document.getElementById('print-shield-css');
       if (el) el.remove();
