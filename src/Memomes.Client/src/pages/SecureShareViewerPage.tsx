@@ -12,6 +12,7 @@ export const SecureShareViewerPage: React.FC = () => {
   // Security checks
   const [isTampered, setIsTampered] = useState(false);
   const [isAlreadyBurned, setIsAlreadyBurned] = useState(false);
+  const [isScreenHidden, setIsScreenHidden] = useState(false);
   const [decryptedParams, setDecryptedParams] = useState<{ tier: string; expiry: string; zk: boolean; oneTime: boolean } | null>(null);
   const [targetFile, setTargetFile] = useState<VaultFile | null>(null);
 
@@ -97,23 +98,95 @@ export const SecureShareViewerPage: React.FC = () => {
     }
   };
 
-  // Enforce View Only access blocks (copy, context menu, text selection)
+  // Enforce View Only access blocks (copy, context menu, text selection, Print, DevTools, blur screenshots)
   useEffect(() => {
     const isViewOnly = decryptedParams?.tier === 'VIEW_ONLY';
     if (!isViewOnly || !isUnlocked || isExpired || isAlreadyBurned) return;
 
+    // 1. Context Menu, Copy, and Text Selection
     const preventActions = (e: Event) => {
       e.preventDefault();
     };
 
+    // 2. devtools & print keyboard shortcuts blocker
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F12
+      if (e.key === 'F12') {
+        e.preventDefault();
+        return;
+      }
+      
+      // Ctrl+Shift+I / Cmd+Opt+I (Inspect)
+      // Ctrl+Shift+J / Cmd+Opt+J (Console)
+      // Ctrl+Shift+C (Inspect elements)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C' || e.key === 'i' || e.key === 'j' || e.key === 'c')) {
+        e.preventDefault();
+        return;
+      }
+
+      // Ctrl+U / Cmd+U (View Source)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        return;
+      }
+
+      // Ctrl+P / Cmd+P (Print)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        return;
+      }
+
+      // PrintScreen Key / Snapshot key
+      if (e.key === 'PrintScreen' || e.key === 'Snapshot') {
+        e.preventDefault();
+        setIsScreenHidden(true);
+        setTimeout(() => setIsScreenHidden(false), 2000);
+      }
+    };
+
+    // 3. Screen Capture Shield (Blur/Visibility check)
+    const handleFocusLoss = () => {
+      setIsScreenHidden(true);
+    };
+
+    const handleFocusGain = () => {
+      setIsScreenHidden(false);
+    };
+
+    // 4. Inject Dynamic CSS Print Shield block
+    const styleElement = document.createElement('style');
+    styleElement.id = 'print-shield-css';
+    styleElement.innerHTML = `
+      @media print {
+        body { display: none !important; }
+        html { display: none !important; }
+      }
+    `;
+    document.head.appendChild(styleElement);
+
     document.addEventListener('contextmenu', preventActions);
     document.addEventListener('copy', preventActions);
     document.addEventListener('selectstart', preventActions);
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Listen to focus/blur to shield against snipping tools
+    window.addEventListener('blur', handleFocusLoss);
+    window.addEventListener('focus', handleFocusGain);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) handleFocusLoss();
+      else handleFocusGain();
+    });
 
     return () => {
       document.removeEventListener('contextmenu', preventActions);
       document.removeEventListener('copy', preventActions);
       document.removeEventListener('selectstart', preventActions);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('blur', handleFocusLoss);
+      window.removeEventListener('focus', handleFocusGain);
+      
+      const el = document.getElementById('print-shield-css');
+      if (el) el.remove();
     };
   }, [decryptedParams, isUnlocked, isExpired, isAlreadyBurned]);
 
@@ -257,6 +330,17 @@ export const SecureShareViewerPage: React.FC = () => {
                 <h3 className="font-extrabold text-white text-base">Session Expired</h3>
                 <p className="text-xs text-gray-400 font-mono max-w-md mx-auto leading-relaxed">
                   The secure S3 presigned URL key has expired. Decrypted RAM buffers flushed successfully.
+                </p>
+              </div>
+            ) : isScreenHidden ? (
+              /* Screen Capture Shield Overlay */
+              <div className="absolute inset-0 bg-black/95 z-40 flex flex-col items-center justify-center text-center p-8 space-y-3 animate-in fade-in duration-100">
+                <div className="w-14 h-14 rounded-full bg-red-950/80 border-2 border-red-500/50 flex items-center justify-center mx-auto text-red-400 animate-pulse">
+                  <ShieldAlert className="w-8 h-8" />
+                </div>
+                <h3 className="font-extrabold text-white text-base">Capture Shield Active</h3>
+                <p className="text-xs text-gray-400 font-mono max-w-sm mx-auto leading-relaxed">
+                  Decrypted buffers hidden. Capture tool, focus loss, or screenshot attempt detected.
                 </p>
               </div>
             ) : (
