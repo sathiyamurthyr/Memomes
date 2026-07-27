@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Lock, Download, AlertTriangle, RefreshCw, X, ShieldAlert, Clock, Flame } from 'lucide-react';
-import { ShareCrypto } from '../utils/shareCrypto';
+import { ShareCrypto, type ShareParams } from '../utils/shareCrypto';
 import { LocalVaultDb, type VaultFile } from '../utils/localVaultDb';
 
 export const SecureShareViewerPage: React.FC = () => {
@@ -13,7 +13,7 @@ export const SecureShareViewerPage: React.FC = () => {
   const [isTampered, setIsTampered] = useState(false);
   const [isAlreadyBurned, setIsAlreadyBurned] = useState(false);
   const [isScreenHidden, setIsScreenHidden] = useState(false);
-  const [decryptedParams, setDecryptedParams] = useState<{ tier: string; expiry: string; zk: boolean; oneTime: boolean } | null>(null);
+  const [decryptedParams, setDecryptedParams] = useState<ShareParams | null>(null);
   const [targetFile, setTargetFile] = useState<VaultFile | null>(null);
 
   // Parse path & query params
@@ -225,6 +225,56 @@ export const SecureShareViewerPage: React.FC = () => {
     return `${timeLeft}s`;
   };
 
+  const renderCustomWatermark = () => {
+    if (decryptedParams?.tier !== 'VIEW_ONLY' || !decryptedParams.watermark) return null;
+    
+    const { text, font, density, rotation } = decryptedParams.watermark;
+    
+    // Grid density options
+    let cols = 3;
+    let rows = 3;
+    if (density === 'low') {
+      cols = 2;
+      rows = 2;
+    } else if (density === 'high') {
+      cols = 4;
+      rows = 4;
+    }
+
+    // Font styles mapping
+    let fontClass = 'font-mono';
+    if (font === 'sans') fontClass = 'font-sans';
+    else if (font === 'serif') fontClass = 'font-serif';
+
+    // Build grid cells
+    const cellCount = cols * rows;
+    const cells = Array.from({ length: cellCount });
+
+    return (
+      <div 
+        className="absolute inset-0 pointer-events-none grid select-none opacity-[0.06] text-white font-extrabold text-center text-xs z-10 leading-normal"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`
+        }}
+      >
+        {cells.map((_, idx) => (
+          <div 
+            key={idx} 
+            className={`flex items-center justify-center ${fontClass}`}
+            style={{ transform: `rotate(${rotation}deg)` }}
+          >
+            <div>
+              {text}
+              <br />
+              <span className="text-[10px] opacity-80">{new Date().toLocaleDateString()}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#0B0F17] text-gray-100 flex flex-col items-center justify-center p-4 selection:bg-primary selection:text-white">
       
@@ -379,13 +429,7 @@ export const SecureShareViewerPage: React.FC = () => {
                 {/* VIEW_ONLY security watermark overlay */}
                 {decryptedParams.tier === 'VIEW_ONLY' && (
                   <>
-                    <div className="absolute inset-0 pointer-events-none grid grid-cols-2 grid-rows-2 select-none opacity-[0.06] rotate-[-15] text-white font-extrabold font-mono text-center text-sm z-10 leading-normal">
-                      <div>RECIPIENT · 103.21.124.5<br />{new Date().toLocaleDateString()}</div>
-                      <div>RECIPIENT · 103.21.124.5<br />{new Date().toLocaleDateString()}</div>
-                      <div>RECIPIENT · 103.21.124.5<br />{new Date().toLocaleDateString()}</div>
-                      <div>RECIPIENT · 103.21.124.5<br />{new Date().toLocaleDateString()}</div>
-                    </div>
-
+                    {renderCustomWatermark()}
                     <div className="absolute bottom-4 left-4 z-25 bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold font-mono px-3 py-1 rounded-full flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5" /> VIEW_ONLY MODE (Saves blocked)
                     </div>

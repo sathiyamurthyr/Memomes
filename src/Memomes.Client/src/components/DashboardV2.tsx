@@ -16,6 +16,7 @@ import { FileControlCenterModal } from './FileControlCenterModal';
 import { UploadDestinationModal } from './UploadDestinationModal';
 import { UploadSuccessModal } from './UploadSuccessModal';
 import { UploadPipelineManager, type UploadQueueItem } from '../services/uploadPipeline';
+import { LocalVaultDb } from '../utils/localVaultDb';
 
 // Section Pages
 import { DashboardPage } from '../pages/DashboardPage';
@@ -336,10 +337,11 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
 
       {viewingFile && (
         <WatermarkedViewer
-          srcUrl={viewingFile.thumbnailUrl || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80'}
+          srcUrl={LocalVaultDb.getFile(viewingFile.id)?.dataUrl || viewingFile.thumbnailUrl || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80'}
           recipientEmail={userEmail}
           userIp={userIp}
           mediaType="image"
+          showWatermark={false}
           onClose={() => setViewingFile(null)}
         />
       )}

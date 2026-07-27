@@ -41,13 +41,28 @@ async function deriveKey(shareId: string): Promise<CryptoKey> {
   );
 }
 
+export interface WatermarkConfig {
+  text: string;
+  font: string;
+  density: string;
+  rotation: number;
+}
+
+export interface ShareParams {
+  tier: string;
+  expiry: string;
+  zk: boolean;
+  oneTime: boolean;
+  watermark: WatermarkConfig | null;
+}
+
 export class ShareCrypto {
   /**
    * Encrypt parameters into a single secure base64 token
    */
   static async encryptParams(
     shareId: string,
-    params: { tier: string; expiry: string; zk: boolean; oneTime: boolean }
+    params: ShareParams
   ): Promise<string> {
     try {
       const key = await deriveKey(shareId);
@@ -80,7 +95,7 @@ export class ShareCrypto {
   static async decryptParams(
     shareId: string,
     encryptedBase64: string
-  ): Promise<{ tier: string; expiry: string; zk: boolean; oneTime: boolean } | null> {
+  ): Promise<ShareParams | null> {
     try {
       const key = await deriveKey(shareId);
       const payload = new Uint8Array(base64ToArrayBuffer(encryptedBase64));

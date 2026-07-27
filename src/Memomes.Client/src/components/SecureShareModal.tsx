@@ -22,6 +22,10 @@ export const SecureShareModal: React.FC<SecureShareModalProps> = ({
   const [passwordPin, setPasswordPin] = useState('');
   const [expiryOption, setExpiryOption] = useState('60s');
   const [enableWatermark, setEnableWatermark] = useState(true);
+  const [watermarkText, setWatermarkText] = useState('RECIPIENT · 103.21.124.5');
+  const [watermarkFont, setWatermarkFont] = useState('mono'); // mono, sans, serif
+  const [watermarkDensity, setWatermarkDensity] = useState('medium'); // low, medium, high
+  const [watermarkRotation, setWatermarkRotation] = useState(-15); // -45, -15, 0, 90
   const [enableSelfDestruct, setEnableSelfDestruct] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState('');
   
@@ -37,7 +41,13 @@ export const SecureShareModal: React.FC<SecureShareModalProps> = ({
       tier: accessTier,
       expiry: expiryOption,
       zk: true,
-      oneTime: enableSelfDestruct
+      oneTime: enableSelfDestruct,
+      watermark: enableWatermark ? {
+        text: watermarkText,
+        font: watermarkFont,
+        density: watermarkDensity,
+        rotation: watermarkRotation
+      } : null
     });
 
     const link = `${baseUrl}/s/${file.id}?p=${token}`;
@@ -155,19 +165,82 @@ export const SecureShareModal: React.FC<SecureShareModalProps> = ({
             </div>
 
             {/* Dynamic Watermark */}
-            <div className="p-3 bg-surface rounded-xl border border-stroke-default flex items-center justify-between">
-              <div>
-                <div className="font-bold text-gray-200 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-accent-gold" /> Anti-Leak Watermark
+            <div className="p-3 bg-surface rounded-xl border border-stroke-default space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-gray-200 flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-accent-gold" /> Anti-Leak Watermark
+                  </div>
+                  <div className="text-[10px] text-gray-500 font-mono">Overlay email, IP, and time stamps</div>
                 </div>
-                <div className="text-[10px] text-gray-500">Overlays email & IP</div>
+                <input
+                  type="checkbox"
+                  checked={enableWatermark}
+                  onChange={(e) => setEnableWatermark(e.target.checked)}
+                  className="rounded border-stroke-default accent-primary"
+                />
               </div>
-              <input
-                type="checkbox"
-                checked={enableWatermark}
-                onChange={(e) => setEnableWatermark(e.target.checked)}
-                className="rounded border-stroke-default accent-primary"
-              />
+
+              {enableWatermark && (
+                <div className="space-y-2.5 pt-2 border-t border-stroke-default animate-in fade-in duration-200">
+                  {/* Watermark text */}
+                  <div>
+                    <span className="block text-[10px] text-gray-400 font-bold mb-1">Watermark Text</span>
+                    <input
+                      type="text"
+                      value={watermarkText}
+                      onChange={(e) => setWatermarkText(e.target.value)}
+                      placeholder="e.g. RECIPIENT · 103.21.124.5"
+                      className="w-full bg-surface-card border border-stroke-default rounded-lg px-2.5 py-1.5 text-white font-mono text-[10px]"
+                    />
+                  </div>
+
+                  {/* Font Family selector */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <span className="block text-[9px] text-gray-400 font-bold mb-1">Font Style</span>
+                      <select
+                        value={watermarkFont}
+                        onChange={(e) => setWatermarkFont(e.target.value)}
+                        className="w-full bg-surface-card border border-stroke-default rounded-lg px-1.5 py-1 text-white font-mono text-[10px] focus:outline-none"
+                      >
+                        <option value="mono">Monospace</option>
+                        <option value="sans">Sans-Serif</option>
+                        <option value="serif">Serif</option>
+                      </select>
+                    </div>
+
+                    {/* Density selector */}
+                    <div>
+                      <span className="block text-[9px] text-gray-400 font-bold mb-1">Density</span>
+                      <select
+                        value={watermarkDensity}
+                        onChange={(e) => setWatermarkDensity(e.target.value)}
+                        className="w-full bg-surface-card border border-stroke-default rounded-lg px-1.5 py-1 text-white font-mono text-[10px] focus:outline-none"
+                      >
+                        <option value="low">Low (2x2)</option>
+                        <option value="medium">Medium (3x3)</option>
+                        <option value="high">High (4x4)</option>
+                      </select>
+                    </div>
+
+                    {/* Direction / Rotation selector */}
+                    <div>
+                      <span className="block text-[9px] text-gray-400 font-bold mb-1">Direction</span>
+                      <select
+                        value={watermarkRotation}
+                        onChange={(e) => setWatermarkRotation(Number(e.target.value))}
+                        className="w-full bg-surface-card border border-stroke-default rounded-lg px-1.5 py-1 text-white font-mono text-[10px] focus:outline-none"
+                      >
+                        <option value="-45">Diagonal (-45°)</option>
+                        <option value="-15">Diagonal (-15°)</option>
+                        <option value="0">Horizontal (0°)</option>
+                        <option value="90">Vertical (90°)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
