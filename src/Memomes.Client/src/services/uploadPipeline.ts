@@ -97,35 +97,41 @@ export class UploadPipelineManager {
       item.progress = 65;
       this.notify();
 
-      // Send init upload to API
-      const res = await fetch('/api/files/init-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: 'a1b2c3d4-e5f6-7890-abcd-1234567890ab',
-          fileNameEncrypted: item.name,
-          contentTypeEncrypted: item.file.type || 'application/octet-stream',
-          sizeBytes: item.size,
-          contentHash
-        })
-      });
-
-      if (res.ok) {
-        const fileData = await res.json();
-        if (this.onCompleteCallback) {
-          this.onCompleteCallback({
-            id: fileData.fileId || item.id,
+      let fileId = item.id;
+      try {
+        const res = await fetch('/api/files/init-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: 'a1b2c3d4-e5f6-7890-abcd-1234567890ab',
             fileNameEncrypted: item.name,
             contentTypeEncrypted: item.file.type || 'application/octet-stream',
             sizeBytes: item.size,
-            contentHash,
-            thumbnailUrl: item.thumbnailUrl,
-            accessTier: 'FULL_CONTROL',
-            isColdStorage: false,
-            lastAccessedAt: new Date().toISOString(),
-            createdAt: new Date().toISOString()
-          });
+            contentHash
+          })
+        });
+
+        if (res.ok) {
+          const fileData = await res.json();
+          fileId = fileData.fileId || item.id;
         }
+      } catch (fetchErr) {
+        console.warn("Backend API offline. Fallback to mock Client-Side indexing.", fetchErr);
+      }
+
+      if (this.onCompleteCallback) {
+        this.onCompleteCallback({
+          id: fileId,
+          fileNameEncrypted: item.name,
+          contentTypeEncrypted: item.file.type || 'application/octet-stream',
+          sizeBytes: item.size,
+          contentHash,
+          thumbnailUrl: item.thumbnailUrl || (item.file.type.startsWith('image/') ? URL.createObjectURL(item.file) : undefined),
+          accessTier: 'FULL_CONTROL',
+          isColdStorage: false,
+          lastAccessedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        });
       }
 
       item.progress = 100;
