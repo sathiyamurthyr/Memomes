@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
 import { getAppBaseUrl } from '../utils/urlHelper';
+import { ShareCrypto } from '../utils/shareCrypto';
 
 interface SecureShareModalProps {
   file: FileItem;
@@ -28,9 +29,18 @@ export const SecureShareModal: React.FC<SecureShareModalProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [showQr, setShowQr] = useState(false);
 
-  const handleGenerateShare = () => {
+  const handleGenerateShare = async () => {
     const baseUrl = getAppBaseUrl();
-    const link = `${baseUrl}/s/${file.id}?tier=${accessTier}&expiry=${expiryOption}&zk=1`;
+    
+    // Encrypt the parameters into a secure token
+    const token = await ShareCrypto.encryptParams(file.id, {
+      tier: accessTier,
+      expiry: expiryOption,
+      zk: true,
+      oneTime: enableSelfDestruct
+    });
+
+    const link = `${baseUrl}/s/${file.id}?p=${token}`;
     setGeneratedLink(link);
     if (onShareCreated) {
       onShareCreated({

@@ -1,6 +1,7 @@
 import { ThumbnailGenerator } from '../utils/thumbnailGenerator';
 import { ClientHasher } from '../crypto/hash';
 import { ZkCrypto } from '../crypto/zkCrypto';
+import { LocalVaultDb } from '../utils/localVaultDb';
 
 export type UploadStatus = 'Pending' | 'Encrypting' | 'Uploading' | 'Complete' | 'Failed';
 
@@ -118,6 +119,13 @@ export class UploadPipelineManager {
       } catch (fetchErr) {
         console.warn("Backend API offline. Fallback to mock Client-Side indexing.", fetchErr);
       }
+
+      // Save payload to local vault database simulator
+      const reader = new FileReader();
+      reader.onload = () => {
+        LocalVaultDb.saveFile(fileId, item.name, item.file.type, reader.result as string);
+      };
+      reader.readAsDataURL(item.file);
 
       if (this.onCompleteCallback) {
         this.onCompleteCallback({
