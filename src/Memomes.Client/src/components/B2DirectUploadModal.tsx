@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, Check, AlertTriangle, X, Database } from 'lucide-react';
+import { Upload, Check, AlertTriangle, X, Database, ExternalLink } from 'lucide-react';
 import { b2SyncWorker } from '../utils/b2SyncWorker';
 
 interface B2DirectUploadModalProps {
@@ -270,15 +270,26 @@ export const B2DirectUploadModal: React.FC<B2DirectUploadModalProps> = ({ onClos
                   No B2 upload logs recorded yet. Upload a file above!
                 </div>
               ) : (
-                b2State.b2RecordLogs.map((log, i) => (
-                  <div key={i} className="p-2.5 rounded-xl bg-[#0E1524] border border-white/[0.06] flex items-center justify-between">
-                    <div>
-                      <div className="text-white font-bold text-xs">{log.name}</div>
-                      <div className="text-[10px] text-[#22C55E]">Path: {log.b2Path}</div>
+                b2State.b2RecordLogs.map((log, i) => {
+                  const url = log.b2FinalUrl || `https://f004.backblazeb2.com/file/${bucketName}/${log.b2Path}`;
+                  return (
+                    <div key={i} className="p-3 rounded-xl bg-[#0E1524] border border-white/[0.06] flex items-center justify-between gap-2">
+                      <div className="overflow-hidden">
+                        <div className="text-white font-bold text-xs truncate">{log.name}</div>
+                        <div className="text-[10px] text-[#22C55E] truncate">Path: {log.b2Path}</div>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-[#F5C027] hover:underline font-bold flex items-center gap-1 mt-0.5"
+                        >
+                          <ExternalLink className="w-3 h-3" /> View B2 Direct Link
+                        </a>
+                      </div>
+                      <span className="text-[9px] text-[#94A3B8] shrink-0">{log.uploadedAt}</span>
                     </div>
-                    <span className="text-[9px] text-[#94A3B8]">{log.uploadedAt}</span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

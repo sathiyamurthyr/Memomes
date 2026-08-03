@@ -94,6 +94,26 @@ export class B2SyncWorker {
       this.state.b2RecordLogs = [];
     }
 
+    // Automatically sync b2RecordLogs from LocalVaultDb for all B2-synced files
+    const vaultFiles = LocalVaultDb.getAllFiles();
+    const syncedFiles = vaultFiles.filter(f => f.b2Synced);
+
+    for (const file of syncedFiles) {
+      const b2Path = file.b2Path || file.metadata?.object_key || `vault/${file.id}`;
+      const b2FinalUrl = file.b2FinalUrl || file.metadata?.b2_final_url || `https://f004.backblazeb2.com/file/${B2_BUCKET_NAME}/${b2Path}`;
+      if (!this.state.b2RecordLogs.some(r => r.id === file.id)) {
+        this.state.b2RecordLogs.unshift({
+          id: file.id,
+          name: file.name,
+          bucket: file.b2Bucket || B2_BUCKET_NAME,
+          b2Path,
+          b2FinalUrl,
+          uploadedAt: file.b2SyncedAt ? new Date(file.b2SyncedAt).toLocaleTimeString() : 'Synced'
+        });
+      }
+    }
+    localStorage.setItem('memomes_b2_records', JSON.stringify(this.state.b2RecordLogs));
+
     this.updateFileCounts();
 
     // Immediate sync after 3 s (give browser time to finish rendering)
@@ -125,6 +145,23 @@ export class B2SyncWorker {
     const files = LocalVaultDb.getAllFiles();
     this.state.syncedCount = files.filter(f => f.b2Synced).length;
     this.state.pendingCount = files.filter(f => !f.b2Synced).length;
+
+    // Ensure b2RecordLogs contains all synced files
+    for (const file of files.filter(f => f.b2Synced)) {
+      const b2Path = file.b2Path || file.metadata?.object_key || `vault/${file.id}`;
+      const b2FinalUrl = file.b2FinalUrl || file.metadata?.b2_final_url || `https://f004.backblazeb2.com/file/${B2_BUCKET_NAME}/${b2Path}`;
+      if (!this.state.b2RecordLogs.some(r => r.id === file.id)) {
+        this.state.b2RecordLogs.unshift({
+          id: file.id,
+          name: file.name,
+          bucket: file.b2Bucket || B2_BUCKET_NAME,
+          b2Path,
+          b2FinalUrl,
+          uploadedAt: file.b2SyncedAt ? new Date(file.b2SyncedAt).toLocaleTimeString() : 'Synced'
+        });
+      }
+    }
+
     this.notifyListeners();
   }
 
