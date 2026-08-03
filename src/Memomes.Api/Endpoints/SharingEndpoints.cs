@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Memomes.Api.Data;
 using Memomes.Api.Models;
@@ -31,8 +32,8 @@ public static class SharingEndpoints
     public record ReshareApproveInput(Guid EnvelopeId, Guid OwnerUserId, string EncryptedKeyEnvelopeForRecipient);
 
     private static async Task<IResult> SavePublicKeyAsync(
-        SavePublicKeyInput input,
-        AppDbContext db)
+        [FromBody] SavePublicKeyInput input,
+        [FromServices] AppDbContext db)
     {
         var existing = await db.UserPublicKeys.FindAsync(input.UserId);
         if (existing != null)
@@ -67,8 +68,8 @@ public static class SharingEndpoints
     }
 
     private static async Task<IResult> CreateEnvelopeAsync(
-        CreateEnvelopeInput input,
-        AppDbContext db)
+        [FromBody] CreateEnvelopeInput input,
+        [FromServices] AppDbContext db)
     {
         var file = await db.StoredFiles.FindAsync(input.FileId);
         if (file == null) return Results.NotFound(new { Error = "File not found" });
@@ -114,8 +115,8 @@ public static class SharingEndpoints
     }
 
     private static async Task<IResult> CreateReshareRequestAsync(
-        ReshareRequestInput input,
-        AppDbContext db)
+        [FromBody] ReshareRequestInput input,
+        [FromServices] AppDbContext db)
     {
         var file = await db.StoredFiles.FindAsync(input.FileId);
         if (file == null) return Results.NotFound(new { Error = "File not found" });
@@ -138,8 +139,8 @@ public static class SharingEndpoints
     }
 
     private static async Task<IResult> ApproveReshareRequestAsync(
-        ReshareApproveInput input,
-        AppDbContext db)
+        [FromBody] ReshareApproveInput input,
+        [FromServices] AppDbContext db)
     {
         var envelope = await db.FileKeyEnvelopes.Include(e => e.File).FirstOrDefaultAsync(e => e.Id == input.EnvelopeId);
         if (envelope == null) return Results.NotFound(new { Error = "Reshare request not found" });

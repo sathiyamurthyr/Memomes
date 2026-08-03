@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>memomes CLOUD — Personal Cloud Vault</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #070B14; color: #FFFFFF; margin: 0; overflow-x: hidden; }
+    h1, h2, h3, .font-heading { font-family: 'Geist', 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .glass-card { background: #0E1524; border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 20px; }
+    .gold-pill { background: rgba(245, 192, 39, 0.12); border: 1px solid rgba(245, 192, 39, 0.35); color: #F5C027; }
+    .btn-gold { height: 48px; border-radius: 16px; background: linear-gradient(135deg, #F5C027 0%, #D4A017 100%); color: #070B14; font-weight: 800; font-size: 14px; padding: 0 22px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; box-shadow: 0 0 30px rgba(245, 192, 39, 0.3); cursor: pointer; transition: all 200ms ease; }
+    .btn-gold:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 0 45px rgba(245, 192, 39, 0.5); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative selection:bg-[#F5C027] selection:text-black">
+  
+  <!-- Header -->
+  <header class="h-20 bg-[#0B101D] border-b border-white/[0.06] sticky top-0 z-40 px-6 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2.5">
+        <svg viewBox="0 0 100 100" fill="none" class="w-10 h-10 drop-shadow-[0_4px_12px_rgba(245,192,39,0.3)]">
+          <defs>
+            <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#FFF2A1" />
+              <stop offset="35%" stop-color="#F5C027" />
+              <stop offset="70%" stop-color="#D4A017" />
+              <stop offset="100%" stop-color="#8A6400" />
+            </linearGradient>
+          </defs>
+          <path d="M25 65 C15 65 10 55 18 45 C15 32 30 22 45 25 C55 15 75 20 78 35 C88 38 90 52 82 62 C78 65 72 65 68 65" stroke="url(#goldGrad)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" />
+          <rect x="72" y="58" width="5" height="5" rx="1" fill="url(#goldGrad)" />
+          <rect x="79" y="54" width="6" height="6" rx="1" fill="url(#goldGrad)" />
+          <rect x="86" y="58" width="5" height="5" rx="1" fill="url(#goldGrad)" />
+          <path d="M50 32 L68 39 C68 55 58 67 50 72 C42 67 32 55 32 39 L50 32 Z" fill="#0A0E18" stroke="url(#goldGrad)" stroke-width="4" stroke-linejoin="round" />
+          <path d="M40 43 L40 58 M40 43 L50 52 L60 43 M60 43 L60 58" stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="50" cy="56" r="2.5" fill="url(#goldGrad)" />
+        </svg>
+        <div class="flex flex-col">
+          <div class="text-xl font-black tracking-tight leading-none font-heading flex items-center">
+            <span class="text-white">memo</span><span class="text-[#F5C027]">mes</span>
+          </div>
+          <div class="text-[10px] font-extrabold text-[#F5C027] tracking-[0.3em] flex items-center gap-1 mt-0.5">
+            <span class="h-[1px] bg-gradient-to-r from-transparent to-[#F5C027] flex-1 opacity-70"></span>
+            <span>CLOUD</span>
+            <span class="h-[1px] bg-gradient-to-l from-transparent to-[#F5C027] flex-1 opacity-70"></span>
+          </div>
+        </div>
+      </div>
+      <span class="px-3 py-1 rounded-xl gold-pill text-xs font-mono font-bold ml-2">👑 PRO VAULT</span>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <button onclick="document.getElementById('vault-modal').classList.remove('hidden')" class="btn-gold text-xs font-extrabold">
+        📤 Upload New File
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="relative z-10 max-w-7xl mx-auto px-6 py-8 space-y-8 my-auto w-full">
+    
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div class="space-y-2">
+        <h1 class="text-3xl font-black text-white font-heading">Good Evening, <span class="text-[#F5C027]">Sathiya</span> 👋</h1>
+        <p class="text-xs text-[#94A3B8]">Your files are secure. You have complete control, even after sharing.</p>
+        <div class="flex flex-wrap items-center gap-3 pt-1">
+          <span class="px-3.5 py-1.5 rounded-full bg-[#22C55E]/10 border border-[#22C55E]/30 text-[#22C55E] text-xs font-semibold">🛡️ 98% Security Health</span>
+          <span class="px-3.5 py-1.5 rounded-full bg-[#F5C027]/10 border border-[#F5C027]/30 text-[#F5C027] text-xs font-semibold">👥 3 Pending Shares</span>
+          <span class="px-3.5 py-1.5 rounded-full bg-[#3B82F6]/10 border border-[#3B82F6]/30 text-[#3B82F6] text-xs font-semibold">☁️ 12 Files Uploaded This Week</span>
+        </div>
+      </div>
+
+      <!-- Security Status Box -->
+      <div class="glass-card p-5 border-[#F5C027]/30 flex items-center justify-between gap-6 max-w-md w-full">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#F5C027]/20 to-[#F5C027]/5 border border-[#F5C027]/40 flex items-center justify-center text-[#F5C027] text-xl">
+            👑
+          </div>
+          <div>
+            <div class="text-xs font-bold text-white">Security Status</div>
+            <div class="text-[11px] text-[#22C55E] font-semibold">All systems protected</div>
+          </div>
+        </div>
+
+        <div class="space-y-1 text-[11px] font-mono border-l border-white/[0.06] pl-4">
+          <div class="flex justify-between gap-3 text-[#CBD5E1]"><span>✔ AES-256 Encryption</span> <span className="text-[#22C55E]">Active</span></div>
+          <div class="flex justify-between gap-3 text-[#CBD5E1]"><span>✔ Zero-Knowledge</span> <span className="text-[#22C55E]">Active</span></div>
+          <div class="flex justify-between gap-3 text-[#CBD5E1]"><span>✔ Auto Backup</span> <span className="text-[#22C55E]">Active</span></div>
+          <div class="flex justify-between gap-3 text-[#CBD5E1]"><span>✔ Recovery Ready</span> <span className="text-[#22C55E]">Active</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Hero Search -->
+    <div class="glass-card p-6 border-[#F5C027]/40 space-y-4 text-left">
+      <div class="flex items-center gap-2 text-xs font-bold text-[#F5C027]">✨ Intelligent AI Search & Discovery</div>
+      <div class="relative">
+        <input type="text" placeholder='Ask AI: "Find passport", "Show tax files", "Invoices from Amazon"...' class="w-full bg-[#070B14] border border-[#F5C027]/40 rounded-2xl px-5 py-4 pl-12 text-sm text-white focus:outline-none">
+        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[#F5C027]">🔍</span>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="px-3.5 py-1.5 rounded-xl bg-[#070B14] border border-white/[0.06] text-[#CBD5E1]">Find passport</span>
+        <span class="px-3.5 py-1.5 rounded-xl bg-[#070B14] border border-white/[0.06] text-[#CBD5E1]">Show tax files</span>
+        <span class="px-3.5 py-1.5 rounded-xl bg-[#070B14] border border-white/[0.06] text-[#CBD5E1]">Invoices from Amazon</span>
+        <span class="px-3.5 py-1.5 rounded-xl bg-[#070B14] border border-white/[0.06] text-[#CBD5E1]">Medical reports</span>
+        <span class="px-3.5 py-1.5 rounded-xl bg-[#070B14] border border-white/[0.06] text-[#CBD5E1]">Contracts</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Interactive Vault Modal -->
+  <div id="vault-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md glass-card p-8 border border-white/[0.06] relative shadow-2xl space-y-6">
+      <button onclick="document.getElementById('vault-modal').classList.add('hidden')" class="absolute top-4 right-4 text-[#94A3B8] hover:text-white p-2">✕</button>
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-[#F5C027] to-[#D4A017] flex items-center justify-center text-[#070B14] text-xl font-bold">🔐</div>
+        <h2 class="text-2xl font-black text-white font-heading">Memomes Vault Auth</h2>
+        <p class="text-xs text-[#94A3B8] font-mono">Zero-Knowledge Key Derivation</p>
+      </div>
+
+      <form onsubmit="event.preventDefault(); alert('Master key derived locally via Web Crypto API (AES-256-GCM). Vault unlocked!'); document.getElementById('vault-modal').classList.add('hidden');" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-[#CBD5E1] mb-1">Email Address</label>
+          <input type="email" value="sathiya@memomes.com" required class="w-full bg-[#070B14] border border-white/[0.06] rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-[#F5C027]">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-[#CBD5E1] mb-1">Master Password</label>
+          <input type="password" value="SuperSecretMasterKey2026!" required class="w-full bg-[#070B14] border border-white/[0.06] rounded-2xl px-4 py-3 text-xs text-white font-mono focus:outline-none focus:border-[#F5C027]">
+        </div>
+        <button type="submit" class="btn-gold w-full text-xs">
+          Decrypt & Enter Vault
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <footer class="relative z-10 py-6 border-t border-white/[0.06] text-center text-xs text-[#94A3B8] font-mono">
+    memomes CLOUD Security Architecture v3.0 · End-to-End Encrypted
+  </footer>
+
+</body>
+</html>

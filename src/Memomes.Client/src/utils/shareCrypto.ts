@@ -1,7 +1,7 @@
 /**
  * Cryptographic utility to encrypt and decrypt share query parameters
  * using Web Crypto API (AES-GCM-256) with keys derived from the Share ID.
- * This prevents tampering with access tiers or expiration settings in the URL.
+ * Includes graceful fallbacks for non-secure HTTP IP origins.
  */
 
 // Helper to convert base64 to ArrayBuffer
@@ -30,7 +30,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 async function deriveKey(shareId: string): Promise<CryptoKey> {
   const enc = new TextEncoder();
-  const rawKey = enc.encode(shareId.padEnd(32, '0').slice(0, 32)); // Ensure 32 bytes key input
+  const rawKey = enc.encode(shareId.padEnd(32, '0').slice(0, 32));
   
   return window.crypto.subtle.importKey(
     'raw',
@@ -65,11 +65,14 @@ export class ShareCrypto {
     params: ShareParams
   ): Promise<string> {
     try {
+      if (!window.crypto?.subtle) {
+        return arrayBufferToBase64(new TextEncoder().encode(JSON.stringify(params)).buffer);
+      }
+
       const key = await deriveKey(shareId);
       const enc = new TextEncoder();
       const encodedData = enc.encode(JSON.stringify(params));
       
-      // Use 12-byte initialization vector
       const iv = window.crypto.getRandomValues(new Uint8Array(12));
       const encrypted = await window.crypto.subtle.encrypt(
         { name: 'AES-GCM', iv },
@@ -77,7 +80,6 @@ export class ShareCrypto {
         encodedData
       );
 
-      // Package iv + ciphertext together
       const payload = new Uint8Array(iv.length + encrypted.byteLength);
       payload.set(iv, 0);
       payload.set(new Uint8Array(encrypted), iv.length);
@@ -97,6 +99,11 @@ export class ShareCrypto {
     encryptedBase64: string
   ): Promise<ShareParams | null> {
     try {
+      if (!window.crypto?.subtle) {
+        const dec = new TextDecoder();
+        return JSON.parse(dec.decode(base64ToArrayBuffer(encryptedBase64)));
+      }
+
       const key = await deriveKey(shareId);
       const payload = new Uint8Array(base64ToArrayBuffer(encryptedBase64));
       

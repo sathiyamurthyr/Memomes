@@ -20,7 +20,7 @@ export const FileDetailsPanel: React.FC<FileDetailsPanelProps> = ({
   onOpenShareModal,
   onOpenControlCenter
 }) => {
-  const isVideo = file.contentTypeEncrypted.includes('video');
+  const isVideo = (file.contentTypeEncrypted || '').includes('video');
 
   return (
     <aside aria-label="File Details Inspector" className="w-80 glass-panel border-l border-stroke-default p-5 space-y-5 text-xs flex flex-col justify-between h-full overflow-y-auto animate-in slide-in-from-right duration-200 shrink-0">
@@ -75,7 +75,7 @@ export const FileDetailsPanel: React.FC<FileDetailsPanelProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">File Size:</span>
-              <span className="text-gray-200">{(file.sizeBytes / 1024 / 1024).toFixed(2)} MB</span>
+              <span className="text-gray-200">{((file.sizeBytes || 0) / 1024 / 1024).toFixed(2)} MB</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Content Type:</span>
@@ -83,11 +83,11 @@ export const FileDetailsPanel: React.FC<FileDetailsPanelProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Created:</span>
-              <span className="text-gray-200">{new Date(file.createdAt).toLocaleDateString()}</span>
+              <span className="text-gray-200">{new Date(file.createdAt || Date.now()).toLocaleDateString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-400">Last Access:</span>
-              <span className="text-gray-200">{new Date(file.lastAccessedAt).toLocaleTimeString()}</span>
+              <span className="text-gray-200">{new Date(file.lastAccessedAt || Date.now()).toLocaleTimeString()}</span>
             </div>
           </div>
         </div>
@@ -100,7 +100,7 @@ export const FileDetailsPanel: React.FC<FileDetailsPanelProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-gray-400 font-mono">ZK SHA-256 Hash:</span>
               <button
-                onClick={() => { navigator.clipboard.writeText(file.contentHash); alert('Content hash copied!'); }}
+                onClick={() => { navigator.clipboard.writeText(file.contentHash || ''); alert('Content hash copied!'); }}
                 className="text-accent-gold hover:text-white flex items-center gap-1"
                 title="Copy Hash"
               >

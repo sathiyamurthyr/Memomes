@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Memomes.Api.Data;
 using Memomes.Api.Models;
@@ -31,8 +32,8 @@ public static class VectorEndpoints
     );
 
     private static async Task<IResult> UpsertVectorAsync(
-        UpsertVectorInput input,
-        AppDbContext db)
+        [FromBody] UpsertVectorInput input,
+        [FromServices] AppDbContext db)
     {
         if (input.Vector512 == null || input.Vector512.Length != 512)
         {
@@ -68,8 +69,8 @@ public static class VectorEndpoints
     }
 
     private static async Task<IResult> SearchVectorsAsync(
-        SearchVectorInput input,
-        AppDbContext db)
+        [FromBody] SearchVectorInput input,
+        [FromServices] AppDbContext db)
     {
         var sw = Stopwatch.StartNew();
 

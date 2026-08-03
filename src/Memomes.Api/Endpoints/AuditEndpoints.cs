@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Memomes.Api.Data;
 using Memomes.Api.Models;
@@ -29,8 +30,8 @@ public static class AuditEndpoints
     );
 
     private static async Task<IResult> SyncOfflineLogsAsync(
-        SyncOfflineLogsInput input,
-        AppDbContext db)
+        [FromBody] SyncOfflineLogsInput input,
+        [FromServices] AppDbContext db)
     {
         if (input.LogEntries == null || input.LogEntries.Count == 0)
         {

@@ -157,15 +157,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <FilePreviewRenderer
                   fileId={file.id}
                   fileName={file.fileNameEncrypted}
-                  contentType={file.contentTypeEncrypted}
+                  contentType={file.contentTypeEncrypted || ''}
                   thumbnailUrl={file.thumbnailUrl}
-                  sizeBytes={file.sizeBytes}
+                  sizeBytes={file.sizeBytes || 0}
                   onOpen={() => onOpenViewer(file)}
                 />
                 <div className="mt-2 font-semibold text-gray-100 text-xs truncate" title={file.fileNameEncrypted}>
                   {file.fileNameEncrypted}
                 </div>
-                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</div>
+                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{((file.sizeBytes || 0) / 1024 / 1024).toFixed(1)} MB</div>
               </div>
 
               {/* 3 Direct Primary Action Buttons */}

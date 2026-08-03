@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Memomes.Api.Data;
 using Memomes.Api.Models;
@@ -50,11 +51,11 @@ public static class FilesEndpoints
     public record DropboxRequestInput(Guid OwnerUserId, string FolderLabel);
 
     private static async Task<IResult> InitUploadAsync(
-        InitUploadRequest input,
-        AppDbContext db,
-        IS3StorageService s3Storage,
-        IAuditLoggerService auditLogger,
-        IPreviewGeneratorService previewGenerator,
+        [FromBody] InitUploadRequest input,
+        [FromServices] AppDbContext db,
+        [FromServices] IS3StorageService s3Storage,
+        [FromServices] IAuditLoggerService auditLogger,
+        [FromServices] IPreviewGeneratorService previewGenerator,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
@@ -159,9 +160,9 @@ public static class FilesEndpoints
     }
 
     private static async Task<IResult> GetPresignedChunkUrlAsync(
-        PresignedChunkRequest input,
-        AppDbContext db,
-        IS3StorageService s3Storage)
+        [FromBody] PresignedChunkRequest input,
+        [FromServices] AppDbContext db,
+        [FromServices] IS3StorageService s3Storage)
     {
         var file = await db.StoredFiles.FindAsync(input.FileId);
         if (file == null) return Results.NotFound(new { Error = "File record not found" });
@@ -171,10 +172,10 @@ public static class FilesEndpoints
     }
 
     private static async Task<IResult> CompleteUploadAsync(
-        CompleteUploadRequest input,
-        AppDbContext db,
-        IS3StorageService s3Storage,
-        IAuditLoggerService auditLogger,
+        [FromBody] CompleteUploadRequest input,
+        [FromServices] AppDbContext db,
+        [FromServices] IS3StorageService s3Storage,
+        [FromServices] IAuditLoggerService auditLogger,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
@@ -318,8 +319,8 @@ public static class FilesEndpoints
     }
 
     private static async Task<IResult> CreateDropboxRequestAsync(
-        DropboxRequestInput input,
-        AppDbContext db)
+        [FromBody] DropboxRequestInput input,
+        [FromServices] AppDbContext db)
     {
         var token = Guid.NewGuid().ToString("N");
         await Task.CompletedTask;

@@ -75,11 +75,11 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
 
   // System Categories Folders
   const systemFolders = [
-    { name: 'Photos', icon: ImageIcon, count: files.filter(f => f.contentTypeEncrypted.startsWith('image/')).length, color: 'text-accent-gold' },
-    { name: 'Videos', icon: Video, count: files.filter(f => f.contentTypeEncrypted.startsWith('video/')).length, color: 'text-primary' },
-    { name: 'Documents', icon: FileText, count: files.filter(f => f.contentTypeEncrypted.includes('pdf')).length, color: 'text-accent-blue' },
-    { name: 'Audio', icon: Music, count: files.filter(f => f.contentTypeEncrypted.startsWith('audio/')).length, color: 'text-purple-400' },
-    { name: 'Archives', icon: Archive, count: files.filter(f => f.contentTypeEncrypted.includes('zip')).length, color: 'text-accent-green' },
+    { name: 'Photos', icon: ImageIcon, count: files.filter(f => (f.contentTypeEncrypted || '').startsWith('image/')).length, color: 'text-accent-gold' },
+    { name: 'Videos', icon: Video, count: files.filter(f => (f.contentTypeEncrypted || '').startsWith('video/')).length, color: 'text-primary' },
+    { name: 'Documents', icon: FileText, count: files.filter(f => (f.contentTypeEncrypted || '').includes('pdf')).length, color: 'text-accent-blue' },
+    { name: 'Audio', icon: Music, count: files.filter(f => (f.contentTypeEncrypted || '').startsWith('audio/')).length, color: 'text-purple-400' },
+    { name: 'Archives', icon: Archive, count: files.filter(f => (f.contentTypeEncrypted || '').includes('zip')).length, color: 'text-accent-green' },
     { name: 'Office Files', icon: FileCode, count: files.filter(f => f.fileNameEncrypted.endsWith('.docx') || f.fileNameEncrypted.endsWith('.xlsx')).length, color: 'text-amber-400' },
   ];
 
@@ -89,18 +89,18 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
   // Filter & Search Logic
   const filteredFiles = nonVaultFiles.filter(f => {
     if (currentFolder) {
-      if (currentFolder === 'Photos') return f.contentTypeEncrypted.startsWith('image/');
-      if (currentFolder === 'Videos') return f.contentTypeEncrypted.startsWith('video/');
-      if (currentFolder === 'Documents') return f.contentTypeEncrypted.includes('pdf');
-      if (currentFolder === 'Audio') return f.contentTypeEncrypted.startsWith('audio/');
-      if (currentFolder === 'Archives') return f.contentTypeEncrypted.includes('zip');
+      if (currentFolder === 'Photos') return (f.contentTypeEncrypted || '').startsWith('image/');
+      if (currentFolder === 'Videos') return (f.contentTypeEncrypted || '').startsWith('video/');
+      if (currentFolder === 'Documents') return (f.contentTypeEncrypted || '').includes('pdf');
+      if (currentFolder === 'Audio') return (f.contentTypeEncrypted || '').startsWith('audio/');
+      if (currentFolder === 'Archives') return (f.contentTypeEncrypted || '').includes('zip');
       if (currentFolder === 'Office Files') return f.fileNameEncrypted.endsWith('.docx') || f.fileNameEncrypted.endsWith('.xlsx');
     }
 
-    if (typeFilter === 'photos') return f.contentTypeEncrypted.startsWith('image/');
-    if (typeFilter === 'videos') return f.contentTypeEncrypted.startsWith('video/');
-    if (typeFilter === 'documents') return f.contentTypeEncrypted.includes('pdf');
-    if (typeFilter === 'archives') return f.contentTypeEncrypted.includes('zip');
+    if (typeFilter === 'photos') return (f.contentTypeEncrypted || '').startsWith('image/');
+    if (typeFilter === 'videos') return (f.contentTypeEncrypted || '').startsWith('video/');
+    if (typeFilter === 'documents') return (f.contentTypeEncrypted || '').includes('pdf');
+    if (typeFilter === 'archives') return (f.contentTypeEncrypted || '').includes('zip');
 
     if (searchQuery.trim()) {
       return f.fileNameEncrypted.toLowerCase().includes(searchQuery.toLowerCase());
@@ -110,12 +110,12 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
 
   // Sorting Logic
   const sortedFiles = [...filteredFiles].sort((a, b) => {
-    if (sortBy === 'newest') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    if (sortBy === 'oldest') return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (sortBy === 'newest') return new Date(b.createdAt || Date.now()).getTime() - new Date(a.createdAt || Date.now()).getTime();
+    if (sortBy === 'oldest') return new Date(a.createdAt || Date.now()).getTime() - new Date(b.createdAt || Date.now()).getTime();
     if (sortBy === 'name-asc') return a.fileNameEncrypted.localeCompare(b.fileNameEncrypted);
     if (sortBy === 'name-desc') return b.fileNameEncrypted.localeCompare(a.fileNameEncrypted);
-    if (sortBy === 'largest') return b.sizeBytes - a.sizeBytes;
-    if (sortBy === 'smallest') return a.sizeBytes - b.sizeBytes;
+    if (sortBy === 'largest') return (b.sizeBytes || 0) - (a.sizeBytes || 0);
+    if (sortBy === 'smallest') return (a.sizeBytes || 0) - (b.sizeBytes || 0);
     if (sortBy === 'recently-shared') return (b.activeSharesCount || 0) - (a.activeSharesCount || 0);
     return 0;
   });
@@ -361,9 +361,9 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
                         <FilePreviewRenderer
                           fileId={file.id}
                           fileName={file.fileNameEncrypted}
-                          contentType={file.contentTypeEncrypted}
+                          contentType={file.contentTypeEncrypted || ''}
                           thumbnailUrl={file.thumbnailUrl}
-                          sizeBytes={file.sizeBytes}
+                          sizeBytes={file.sizeBytes || 0}
                           onOpen={() => onOpenViewer(file)}
                         />
 
@@ -384,8 +384,8 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
                         {file.fileNameEncrypted}
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mt-1">
-                        <span>{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
-                        <span>{new Date(file.createdAt).toLocaleDateString()}</span>
+                        <span>{((file.sizeBytes || 0) / 1024 / 1024).toFixed(1)} MB</span>
+                        <span>{new Date(file.createdAt || Date.now()).toLocaleDateString()}</span>
                       </div>
                     </div>
 
@@ -455,7 +455,7 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
                         </td>
                         <td className="p-3.5 font-semibold text-gray-200">{file.fileNameEncrypted}</td>
                         <td className="p-3.5 text-gray-400 font-mono text-[10px]">{file.contentTypeEncrypted}</td>
-                        <td className="p-3.5 text-gray-300 font-mono">{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</td>
+                        <td className="p-3.5 text-gray-300 font-mono">{((file.sizeBytes || 0) / 1024 / 1024).toFixed(1)} MB</td>
                         <td className="p-3.5">
                           {file.activeSharesCount ? (
                             <span className="px-2 py-0.5 bg-amber-950/60 text-accent-gold border border-amber-500/30 rounded-full text-[10px] font-bold">Shared ({file.activeSharesCount})</span>

@@ -23,7 +23,7 @@ public class S3StorageService : IS3StorageService
     public S3StorageService(IConfiguration configuration, ILogger<S3StorageService> logger)
     {
         _logger = logger;
-        _bucketName = configuration["AWS:BucketName"] ?? "memomes-vault-bucket";
+        _bucketName = configuration["AWS:BucketName"] ?? "sathus-memomes-vault";
 
         var serviceUrl = configuration["AWS:ServiceURL"] ?? "https://s3.us-west-004.backblazeb2.com";
         var accessKey = configuration["AWS:AccessKeyId"] ?? "mock_access_key";

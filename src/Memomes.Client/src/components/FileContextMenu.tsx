@@ -46,7 +46,7 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
         <div className="flex items-center space-x-1 text-[10px] font-mono text-gray-400">
           <span className="text-accent-gold">{file.accessTier}</span>
           <span>·</span>
-          <span>{(file.sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
+          <span>{((file.sizeBytes || 0) / 1024 / 1024).toFixed(1)} MB</span>
         </div>
         <div className="flex items-center space-x-1.5 pt-0.5">
           <span className="px-1.5 py-0.5 bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-[9px] font-bold rounded">
@@ -77,7 +77,7 @@ export const FileContextMenu: React.FC<FileContextMenuProps> = ({
         </button>
 
         <button
-          onClick={() => { navigator.clipboard.writeText(file.contentHash); onClose(); }}
+          onClick={() => { navigator.clipboard.writeText(file.contentHash || ''); onClose(); }}
           className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-gray-200 hover:text-white hover:bg-surface-card transition"
         >
           <Copy className="w-4 h-4 text-accent-blue" />

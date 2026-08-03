@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Memomes.Api.Data;
 using Memomes.Api.Services;
@@ -21,10 +22,10 @@ public static class AccountEndpoints
     public record RollbackInput(Guid UserId, DateTime RollbackPointUtc);
 
     private static async Task<IResult> PurgeAccountAsync(
-        PurgeInput input,
-        AppDbContext db,
-        IS3StorageService s3Storage,
-        IAuditLoggerService auditLogger,
+        [FromBody] PurgeInput input,
+        [FromServices] AppDbContext db,
+        [FromServices] IS3StorageService s3Storage,
+        [FromServices] IAuditLoggerService auditLogger,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
@@ -73,9 +74,9 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> PanicFreezeAsync(
-        PanicFreezeInput input,
-        AppDbContext db,
-        IAuditLoggerService auditLogger,
+        [FromBody] PanicFreezeInput input,
+        [FromServices] AppDbContext db,
+        [FromServices] IAuditLoggerService auditLogger,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
@@ -91,9 +92,9 @@ public static class AccountEndpoints
     }
 
     private static async Task<IResult> RollbackVaultAsync(
-        RollbackInput input,
-        AppDbContext db,
-        IAuditLoggerService auditLogger,
+        [FromBody] RollbackInput input,
+        [FromServices] AppDbContext db,
+        [FromServices] IAuditLoggerService auditLogger,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
