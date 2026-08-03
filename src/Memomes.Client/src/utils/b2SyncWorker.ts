@@ -1,7 +1,15 @@
 /**
- * Backblaze B2 Automatic 2-Minute Background Sync Engine
- * Sweeps client files from local storage/IndexedDB every 2 minutes
- * and uploads encrypted binary payloads to Backblaze B2 bucket: sathus-memomes-vault
+ * Backblaze B2 Direct Upload Engine + Auto Sync Worker
+ *
+ * Upload flow:
+ *   1) Try to authorise directly with Backblaze B2 Native API (b2_authorize_account).
+ *   2) Get an upload URL from B2 (b2_get_upload_url).
+ *   3) Stream the encrypted binary directly to B2 (b2_upload_file).
+ *   4) If B2 Native API fails, fall back to the .NET API presigned S3 URL route.
+ *   5) After a confirmed upload, call LocalVaultDb.markFileAsB2Synced() to atomically
+ *      persist the b2Synced=true flag so the file is NEVER re-uploaded.
+ *
+ * Sync schedule: Immediately on app load + every 2 minutes.
  */
 
 import { LocalVaultDb } from './localVaultDb';
@@ -10,7 +18,7 @@ import type { VaultFile } from './localVaultDb';
 export interface B2SyncState {
   isSyncing: boolean;
   lastSyncedAt: string | null;
-  nextSyncCountdown: number; // in seconds
+  nextSyncCountdown: number;
   syncedCount: number;
   pendingCount: number;
   targetBucket: string;
@@ -21,27 +29,47 @@ export interface B2SyncState {
 
 type SyncStatusListener = (state: B2SyncState) => void;
 
+// ── Backblaze B2 credentials ──────────────────────────────────────────────────
+const B2_KEY_ID = '008e0d1d842b';
+const B2_APP_KEY = '0030f1320724707dc33f380426ddf3371c3fedb37a';
+const B2_BUCKET_NAME = 'sathus-memomes-vault';
+const B2_AUTH_URL = 'https://api.backblazeb2.com/b2api/v3/b2_authorize_account';
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface B2AuthInfo {
+  apiUrl: string;
+  authorizationToken: string;
+  downloadUrl: string;
+}
+
+interface B2UploadUrlInfo {
+  uploadUrl: string;
+  authorizationToken: string;
+}
+
 export class B2SyncWorker {
   private static instance: B2SyncWorker;
   private listeners: Set<SyncStatusListener> = new Set();
-  
+  private b2Auth: B2AuthInfo | null = null;
+  private b2BucketId: string | null = null;
+
+  public b2Config = {
+    keyID: B2_KEY_ID,
+    applicationKey: B2_APP_KEY,
+    bucketName: B2_BUCKET_NAME,
+    serviceUrl: 'https://s3.us-west-004.backblazeb2.com'
+  };
+
   private state: B2SyncState = {
     isSyncing: false,
     lastSyncedAt: null,
-    nextSyncCountdown: 120, // 2 minutes = 120s
+    nextSyncCountdown: 120,
     syncedCount: 0,
     pendingCount: 0,
-    targetBucket: 'sathus-memomes-vault',
+    targetBucket: B2_BUCKET_NAME,
     serviceUrl: 'https://s3.us-west-004.backblazeb2.com',
-    statusMessage: '2-Minute Backblaze B2 Auto Sync Active',
+    statusMessage: 'Backblaze B2 Auto Sync — Initialising…',
     b2RecordLogs: []
-  };
-
-  public b2Config = {
-    keyID: '008e0d1d842b',
-    applicationKey: '0030f1320724707dc33f380426ddf3371c3fedb37a',
-    bucketName: 'sathus-memomes-vault',
-    serviceUrl: 'https://s3.us-west-004.backblazeb2.com'
   };
 
   private constructor() {
@@ -55,131 +83,275 @@ export class B2SyncWorker {
     return B2SyncWorker.instance;
   }
 
+  // ── Initialisation ──────────────────────────────────────────────────────────
+
   private init() {
     try {
       const stored = localStorage.getItem('memomes_b2_records');
-      if (stored) {
-        this.state.b2RecordLogs = JSON.parse(stored);
-      }
+      if (stored) this.state.b2RecordLogs = JSON.parse(stored);
     } catch {
       this.state.b2RecordLogs = [];
     }
 
     this.updateFileCounts();
 
-    setInterval(() => {
-      this.triggerSync('Automated 2-Minute Schedule');
-    }, 120000);
+    // Immediate sync after 3 s (give browser time to finish rendering)
+    setTimeout(() => this.triggerSync('Initial B2 Connection'), 3000);
 
+    // Recurring 2-minute sync
+    setInterval(() => this.triggerSync('2-Minute Schedule'), 120_000);
+
+    // UI countdown ticker
     setInterval(() => {
-      if (this.state.nextSyncCountdown > 0) {
-        this.state.nextSyncCountdown -= 1;
-      } else {
-        this.state.nextSyncCountdown = 120;
-      }
+      this.state.nextSyncCountdown = Math.max(0, this.state.nextSyncCountdown - 1);
       this.notifyListeners();
     }, 1000);
-
-    setTimeout(() => {
-      this.triggerSync('Initial B2 Connection');
-    }, 2000);
   }
+
+  // ── Public API ──────────────────────────────────────────────────────────────
 
   public subscribe(listener: SyncStatusListener): () => void {
     this.listeners.add(listener);
-    listener(this.state);
+    listener({ ...this.state });
     return () => this.listeners.delete(listener);
   }
 
-  private notifyListeners() {
-    this.listeners.forEach(l => l({ ...this.state }));
+  public getState(): B2SyncState {
+    return { ...this.state };
   }
 
   public updateFileCounts() {
     const files = LocalVaultDb.getAllFiles();
-    const synced = files.filter(f => (f as any).b2Synced).length;
-    const pending = files.length - synced;
-    
-    this.state.syncedCount = synced;
-    this.state.pendingCount = pending;
+    this.state.syncedCount = files.filter(f => f.b2Synced).length;
+    this.state.pendingCount = files.filter(f => !f.b2Synced).length;
     this.notifyListeners();
   }
 
-  public async triggerSync(_reason: string = 'Manual Request'): Promise<void> {
+  public async triggerSync(reason: string = 'Manual'): Promise<void> {
     if (this.state.isSyncing) return;
 
     this.state.isSyncing = true;
-    this.state.statusMessage = `Uploading payloads to Backblaze B2 (${this.state.targetBucket})...`;
+    this.state.statusMessage = `Syncing to Backblaze B2 (${B2_BUCKET_NAME})… [${reason}]`;
     this.notifyListeners();
 
     try {
       const files = LocalVaultDb.getAllFiles();
+      const pending = files.filter(f => !f.b2Synced);
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        if (!(file as any).b2Synced) {
-          await this.uploadFileToB2(file);
-          (file as any).b2Synced = true;
-          (file as any).b2SyncedAt = new Date().toISOString();
-          (file as any).b2Bucket = this.state.targetBucket;
-          (file as any).b2Path = `vault/sathiya/${file.id}.bin`;
+      if (pending.length === 0) {
+        this.state.statusMessage = `✔ All files already synced in ${B2_BUCKET_NAME}`;
+        this.state.lastSyncedAt = new Date().toLocaleTimeString();
+        this.state.nextSyncCountdown = 120;
+        this.notifyListeners();
+        return;
+      }
 
-          const record = {
-            id: file.id,
-            name: file.name,
-            bucket: this.state.targetBucket,
-            b2Path: `vault/sathiya/${file.id}.bin`,
-            uploadedAt: new Date().toLocaleTimeString()
-          };
-          this.state.b2RecordLogs.unshift(record);
-          localStorage.setItem('memomes_b2_records', JSON.stringify(this.state.b2RecordLogs));
+      // Authorise with B2 once per session (cache token)
+      await this.ensureB2Auth();
 
-          LocalVaultDb.saveFile(file.id, file.name, file.type, file.dataUrl, file);
+      let uploadedThisCycle = 0;
+      let failedThisCycle = 0;
+
+      for (const file of pending) {
+        const success = await this.uploadSingleFile(file);
+        if (success) {
+          uploadedThisCycle++;
+        } else {
+          failedThisCycle++;
         }
       }
 
       this.state.lastSyncedAt = new Date().toLocaleTimeString();
       this.state.nextSyncCountdown = 120;
-      this.state.statusMessage = `✔ All files uploaded & verified in Backblaze B2 (${this.state.targetBucket})`;
-    } catch (e) {
-      console.warn('Backblaze B2 sync error:', e);
-      this.state.statusMessage = '✔ Sync completed for sathus-memomes-vault';
+
+      if (failedThisCycle === 0) {
+        this.state.statusMessage = `✔ ${uploadedThisCycle} file${uploadedThisCycle !== 1 ? 's' : ''} uploaded to ${B2_BUCKET_NAME}`;
+      } else {
+        this.state.statusMessage = `⚠ ${uploadedThisCycle} uploaded, ${failedThisCycle} failed — will retry in 2 mins`;
+      }
+    } catch (e: any) {
+      console.warn('[B2Sync] Sync cycle error:', e?.message || e);
+      this.state.statusMessage = '⚠ B2 Sync error — retrying in 2 mins';
     } finally {
       this.state.isSyncing = false;
       this.updateFileCounts();
     }
   }
 
-  private async uploadFileToB2(file: VaultFile): Promise<void> {
-    try {
-      const response = await fetch('/api/files/init-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: '00000000-0000-0000-0000-000000000001',
-          fileNameEncrypted: file.fileNameEncrypted || `${file.id}.enc`,
-          contentTypeEncrypted: file.type || 'application/octet-stream',
-          sizeBytes: file.size ? parseInt(file.size) || 1024 * 1024 : 1024 * 1024,
-          contentHash: 'hash_' + Date.now()
-        })
-      });
+  // ── B2 Authorisation ────────────────────────────────────────────────────────
 
-      if (response.ok) {
-        const data = await response.json();
-        const uploadUrl = data.presignedUploadUrl || data.uploadUrl;
-        if (uploadUrl && file.dataUrl) {
-          const binaryBlob = this.dataUrlToBlob(file.dataUrl);
-          await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type || 'application/octet-stream' },
-            body: binaryBlob
-          });
+  private async ensureB2Auth(): Promise<void> {
+    if (this.b2Auth) return; // already authorised this session
+
+    const credentials = btoa(`${B2_KEY_ID}:${B2_APP_KEY}`);
+    const res = await fetch(B2_AUTH_URL, {
+      method: 'GET',
+      headers: { Authorization: `Basic ${credentials}` }
+    });
+
+    if (!res.ok) {
+      throw new Error(`B2 auth failed: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    this.b2Auth = {
+      apiUrl: data.apiInfo?.storageApi?.apiUrl || data.apiUrl,
+      authorizationToken: data.authorizationToken,
+      downloadUrl: data.apiInfo?.storageApi?.downloadUrl || data.downloadUrl
+    };
+
+    // Get bucket ID
+    await this.resolveBucketId();
+  }
+
+  private async resolveBucketId(): Promise<void> {
+    if (!this.b2Auth || this.b2BucketId) return;
+
+    try {
+      const res = await fetch(`${this.b2Auth.apiUrl}/b2api/v3/b2_list_buckets?bucketName=${encodeURIComponent(B2_BUCKET_NAME)}`, {
+        headers: { Authorization: this.b2Auth.authorizationToken }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const bucket = data.buckets?.[0];
+        if (bucket) this.b2BucketId = bucket.bucketId;
+      }
+    } catch {
+      // If we can't resolve bucket ID, uploadFileToB2 will use bucket name fallback
+    }
+  }
+
+  // ── Single File Upload ──────────────────────────────────────────────────────
+
+  private async uploadSingleFile(file: VaultFile): Promise<boolean> {
+    const b2Path = `vault/sathiya/${file.id}.bin`;
+
+    try {
+      // Strategy 1: Direct B2 Native API upload
+      if (this.b2Auth && this.b2BucketId) {
+        const uploaded = await this.uploadViaB2NativeApi(file, b2Path);
+        if (uploaded) {
+          this.persistSyncedRecord(file, b2Path);
+          return true;
         }
       }
-    } catch (err) {
-      console.info('Presigned upload fallback active for Backblaze B2 sathus-memomes-vault');
+    } catch (e: any) {
+      console.warn(`[B2Sync] Native B2 upload failed for ${file.name}:`, e?.message);
+      // Auth may be stale — reset it
+      this.b2Auth = null;
+      this.b2BucketId = null;
     }
+
+    try {
+      // Strategy 2: Fallback — presigned URL via .NET API
+      const uploaded = await this.uploadViaPresignedUrl(file, b2Path);
+      if (uploaded) {
+        this.persistSyncedRecord(file, b2Path);
+        return true;
+      }
+    } catch (e: any) {
+      console.warn(`[B2Sync] Presigned URL upload failed for ${file.name}:`, e?.message);
+    }
+
+    console.warn(`[B2Sync] ⚠ Could not upload ${file.name} — will retry next cycle`);
+    return false;
+  }
+
+  private async uploadViaB2NativeApi(file: VaultFile, b2Path: string): Promise<boolean> {
+    if (!this.b2Auth || !this.b2BucketId) return false;
+
+    // Get an upload URL from B2
+    const uploadUrlRes = await fetch(`${this.b2Auth.apiUrl}/b2api/v3/b2_get_upload_url`, {
+      method: 'POST',
+      headers: {
+        Authorization: this.b2Auth.authorizationToken,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ bucketId: this.b2BucketId })
+    });
+
+    if (!uploadUrlRes.ok) {
+      throw new Error(`b2_get_upload_url failed: ${uploadUrlRes.status}`);
+    }
+
+    const { uploadUrl, authorizationToken: uploadToken }: B2UploadUrlInfo = await uploadUrlRes.json();
+
+    // Convert dataUrl to binary blob
+    const blob = this.dataUrlToBlob(file.dataUrl);
+    const sha1 = await this.computeSha1Hex(await blob.arrayBuffer());
+
+    // Upload directly to B2
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: uploadToken,
+        'X-Bz-File-Name': encodeURIComponent(b2Path),
+        'Content-Type': file.type || 'application/octet-stream',
+        'Content-Length': String(blob.size),
+        'X-Bz-Content-Sha1': sha1
+      },
+      body: blob
+    });
+
+    if (!uploadRes.ok) {
+      const errBody = await uploadRes.text().catch(() => '');
+      throw new Error(`b2_upload_file failed: ${uploadRes.status} ${errBody}`);
+    }
+
+    return true;
+  }
+
+  private async uploadViaPresignedUrl(file: VaultFile, _b2Path: string): Promise<boolean> {
+    const initRes = await fetch('/api/files/init-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: '00000000-0000-0000-0000-000000000001',
+        fileNameEncrypted: file.fileNameEncrypted || `${file.id}.enc`,
+        contentTypeEncrypted: file.type || 'application/octet-stream',
+        sizeBytes: file.size ? parseFloat(file.size) * 1024 * 1024 | 0 : 1024 * 1024,
+        contentHash: `sha256-${file.id}-${Date.now()}`
+      })
+    });
+
+    if (!initRes.ok) return false;
+
+    const data = await initRes.json();
+    const presignedUrl = data.presignedUploadUrl || data.PresignedUploadUrl;
+    if (!presignedUrl) return false;
+
+    const blob = this.dataUrlToBlob(file.dataUrl);
+    const putRes = await fetch(presignedUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: blob
+    });
+
+    return putRes.ok;
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Atomically persist B2 sync state to localStorage.
+   * MUST be called after a confirmed successful upload.
+   */
+  private persistSyncedRecord(file: VaultFile, b2Path: string) {
+    // 1. Update localStorage b2Synced flag — this is what prevents re-uploads
+    LocalVaultDb.markFileAsB2Synced(file.id, b2Path, B2_BUCKET_NAME);
+
+    // 2. Add to visible record log
+    const record = {
+      id: file.id,
+      name: file.name,
+      bucket: B2_BUCKET_NAME,
+      b2Path,
+      uploadedAt: new Date().toLocaleTimeString()
+    };
+    this.state.b2RecordLogs.unshift(record);
+    localStorage.setItem('memomes_b2_records', JSON.stringify(this.state.b2RecordLogs));
+
+    console.info(`[B2Sync] ✔ Uploaded: ${file.name} → ${B2_BUCKET_NAME}/${b2Path}`);
   }
 
   private dataUrlToBlob(dataUrl: string): Blob {
@@ -187,16 +359,27 @@ export class B2SyncWorker {
     const mimeMatch = parts[0]?.match(/:(.*?);/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
     const byteString = atob(parts[1] || '');
-    const byteNumbers = new Array(byteString.length);
+    const byteArray = new Uint8Array(byteString.length);
     for (let i = 0; i < byteString.length; i++) {
-      byteNumbers[i] = byteString.charCodeAt(i);
+      byteArray[i] = byteString.charCodeAt(i);
     }
-    const byteArray = new Uint8Array(byteNumbers);
     return new Blob([byteArray], { type: mimeType });
   }
 
-  public getState(): B2SyncState {
-    return { ...this.state };
+  private async computeSha1Hex(buffer: ArrayBuffer): Promise<string> {
+    try {
+      const hashBuffer = await crypto.subtle.digest('SHA-1', buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+      // Fallback: B2 also accepts "do_not_verify" as the SHA1 for test uploads
+      return 'do_not_verify';
+    }
+  }
+
+  private notifyListeners() {
+    const snapshot = { ...this.state };
+    this.listeners.forEach(l => l(snapshot));
   }
 }
 

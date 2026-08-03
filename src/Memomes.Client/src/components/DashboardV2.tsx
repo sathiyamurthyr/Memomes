@@ -151,7 +151,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
           category: s.category || (s.type.includes('image') ? 'image' : s.type.includes('video') ? 'video' : 'document'),
           badgeColor: '#F5B700',
           badgeType: 'FILE',
-          b2Synced: (s as any).b2Synced || false
+          b2Synced: s.b2Synced || false
         }));
 
         setFiles(prev => {
@@ -164,6 +164,22 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
       console.warn('Could not load stored files from LocalVaultDb', e);
     }
   }, []);
+
+  // Subscribe to B2 sync worker — refresh b2Synced badge on files after each sync cycle
+  useEffect(() => {
+    const unsubscribe = b2SyncWorker.subscribe(() => {
+      // Re-read all files from storage to pick up latest b2Synced flags
+      const updated = LocalVaultDb.getAllFiles();
+      if (updated.length === 0) return;
+      const b2Map = new Map(updated.map(f => [f.id, f.b2Synced ?? false]));
+      setFiles(prev => prev.map(f => ({
+        ...f,
+        b2Synced: b2Map.has(f.id) ? b2Map.get(f.id)! : f.b2Synced
+      })));
+    });
+    return unsubscribe;
+  }, []);
+
 
   const addActivityLog = (action: string, details: string, status: 'Success' | 'Encrypted' | 'Warning' | 'Purged' = 'Success') => {
     const newLog: ActivityLogEntry = {
