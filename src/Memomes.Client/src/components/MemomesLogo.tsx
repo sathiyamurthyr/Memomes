@@ -3,6 +3,7 @@ import React from 'react';
 interface MemomesLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showTagline?: boolean;
+  showText?: boolean;
   className?: string;
   onClick?: () => void;
 }
@@ -10,6 +11,7 @@ interface MemomesLogoProps {
 export const MemomesLogo: React.FC<MemomesLogoProps> = ({
   size = 'md',
   showTagline = false,
+  showText = true,
   className = '',
   onClick
 }) => {
@@ -104,19 +106,21 @@ export const MemomesLogo: React.FC<MemomesLogoProps> = ({
         </div>
 
         {/* 2. Brand Name Typography: memo (White) + mes (Warm Gold) */}
-        <div className="flex flex-col text-left">
-          <div className={`${textSizes[size]} font-black tracking-tight leading-none font-heading flex items-center`}>
-            <span className="text-white">memo</span>
-            <span className="text-[#F5C027] drop-shadow-[0_2px_8px_rgba(245,192,39,0.3)]">mes</span>
-          </div>
+        {showText && (
+          <div className="flex flex-col text-left">
+            <div className={`${textSizes[size]} font-black tracking-tight leading-none font-heading flex items-center`}>
+              <span className="text-white">memo</span>
+              <span className="text-[#F5C027] drop-shadow-[0_2px_8px_rgba(245,192,39,0.3)]">mes</span>
+            </div>
 
-          {/* Subtitle Line: — CLOUD — */}
-          <div className={`${cloudSubSizes[size]} font-extrabold text-[#F5C027] flex items-center justify-between gap-1.5 mt-1`}>
-            <span className="h-[1px] bg-gradient-to-r from-transparent to-[#F5C027] flex-1 opacity-70" />
-            <span>CLOUD</span>
-            <span className="h-[1px] bg-gradient-to-l from-transparent to-[#F5C027] flex-1 opacity-70" />
+            {/* Subtitle Line: — CLOUD — */}
+            <div className={`${cloudSubSizes[size]} font-extrabold text-[#F5C027] flex items-center justify-between gap-1.5 mt-1`}>
+              <span className="h-[1px] bg-gradient-to-r from-transparent to-[#F5C027] flex-1 opacity-70" />
+              <span>CLOUD</span>
+              <span className="h-[1px] bg-gradient-to-l from-transparent to-[#F5C027] flex-1 opacity-70" />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* 3. Optional Tagline Banner */}

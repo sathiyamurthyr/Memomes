@@ -63,4 +63,15 @@ export class LocalVaultDb {
       return [];
     }
   }
+
+  static removeFile(id: string) {
+    try {
+      const filesStr = localStorage.getItem('memomes_vault_files') || '[]';
+      const files: VaultFile[] = JSON.parse(filesStr);
+      const filtered = files.filter(f => f.id !== id);
+      localStorage.setItem('memomes_vault_files', JSON.stringify(filtered));
+    } catch (e) {
+      console.warn('Failed to remove file from local storage', e);
+    }
+  }
 }

@@ -1,120 +1,163 @@
 import React from 'react';
-import {
-  LayoutDashboard, Folder, Shield, Lock, Users, Share2, Star,
-  Clock, Trash2, Activity, Sparkles, Wifi, Settings, HelpCircle, ChevronLeft, ChevronRight
+import { 
+  LayoutDashboard, 
+  FolderKey, 
+  Share2, 
+  Star, 
+  Clock, 
+  Sparkles, 
+  ShieldAlert, 
+  Lock, 
+  Trash2, 
+  Activity, 
+  Settings, 
+  Zap,
+  HardDrive
 } from 'lucide-react';
 
 interface SidebarProps {
-  activeSection: string;
-  onSelectSection: (section: string) => void;
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
+  activeTab: string;
+  onSelectTab: (tab: string) => void;
+  favoritesCount?: number;
+  sharedCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  activeSection,
-  onSelectSection,
-  isCollapsed,
-  onToggleCollapse
+  activeTab,
+  onSelectTab,
+  favoritesCount = 4,
+  sharedCount = 12
 }) => {
-  const navItems = [
+  const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'my-files', label: 'My Files', icon: Folder },
-    { id: 'secure-shares', label: 'Secure Shares', icon: Shield },
-    { id: 'digital-vault', label: 'Digital Vault', icon: Lock, badge: 'Zero-K' },
-    { id: 'shared-with-me', label: 'Shared With Me', icon: Users },
-    { id: 'shared-by-me', label: 'Shared By Me', icon: Share2 },
-    { id: 'favorites', label: 'Favorites', icon: Star },
+    { id: 'files', label: 'My Files', icon: FolderKey },
+    { id: 'shared', label: 'Shared With Me', icon: Share2, badge: sharedCount },
+    { id: 'favorites', label: 'Favorites', icon: Star, badge: favoritesCount },
     { id: 'recent', label: 'Recent', icon: Clock },
-    { id: 'trash', label: 'Vault Trash', icon: Trash2 },
+  ];
+
+  const intelligentNavItems = [
+    { id: 'ai-intelligence', label: 'AI Intelligence', icon: Sparkles, highlight: true },
+    { id: 'control-center', label: 'Control Center', icon: ShieldAlert, alert: true },
+    { id: 'secure-vault', label: 'Secure Vault', icon: Lock },
     { id: 'activity', label: 'Activity Log', icon: Activity },
-    { id: 'ai-search', label: 'AI Search', icon: Sparkles },
-    { id: 'nearby-share', label: 'Nearby Share', icon: Wifi },
+    { id: 'recycle-bin', label: 'Recycle Bin', icon: Trash2 },
   ];
 
   return (
-    <aside
-      className={`fixed left-0 top-0 bottom-0 z-30 bg-surface-container/95 backdrop-blur-xl border-r border-stroke-default transition-all duration-300 flex flex-col justify-between ${
-        isCollapsed ? 'w-16' : 'w-64'
-      }`}
-    >
-      <div>
-        {/* Brand Header */}
-        <div className="h-16 px-4 flex items-center justify-between border-b border-stroke-default">
-          {!isCollapsed && (
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary to-accent-gold p-0.5 shadow-md">
-                <div className="w-full h-full bg-surface-container rounded-[10px] flex items-center justify-center">
-                  <Lock className="w-4 h-4 text-accent-gold" />
-                </div>
-              </div>
-              <span className="font-extrabold text-white text-sm tracking-wide">Memomes Cloud</span>
-            </div>
-          )}
-
-          <button
-            onClick={onToggleCollapse}
-            className="p-1.5 rounded-lg bg-surface hover:bg-surface-card border border-stroke-default text-gray-400 hover:text-white mx-auto"
-            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
+    <aside className="w-64 shrink-0 hidden md:flex flex-col h-[calc(100vh-4rem)] bg-[#0F172A]/70 backdrop-blur-xl border-r border-white/10 p-4 justify-between select-none">
+      <div className="space-y-6">
+        {/* Main Navigation Section */}
+        <div>
+          <h4 className="px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 font-mono">
+            Navigation
+          </h4>
+          <nav className="space-y-1">
+            {mainNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectTab(item.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#F5B700]/20 to-[#F5B700]/5 text-white border border-[#F5B700]/30 shadow-[0_0_15px_rgba(245,183,0,0.1)]'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-[#F5B700]' : 'text-slate-400'}`} />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                      isActive ? 'bg-[#F5B700] text-slate-950 font-bold' : 'bg-slate-800 text-slate-400 border border-white/5'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Navigation Items */}
-        <div className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)]">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectSection(item.id)}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition ${
-                  isActive
-                    ? 'bg-primary/20 text-accent-gold border border-primary/40 shadow-sm'
-                    : 'text-gray-400 hover:text-white hover:bg-surface-card'
-                } ${isCollapsed ? 'justify-center px-0' : ''}`}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-accent-gold' : ''}`} />
-                {!isCollapsed && (
-                  <div className="flex-1 flex justify-between items-center text-left">
+        {/* Security & Intelligence Section */}
+        <div>
+          <h4 className="px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 font-mono">
+            Security & Intelligence
+          </h4>
+          <nav className="space-y-1">
+            {intelligentNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectTab(item.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#F5B700]/20 to-[#F5B700]/5 text-white border border-[#F5B700]/30 shadow-[0_0_15px_rgba(245,183,0,0.1)]'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-4 h-4 ${
+                      item.highlight ? 'text-[#F5B700] animate-pulse' : isActive ? 'text-[#F5B700]' : 'text-slate-400'
+                    }`} />
                     <span>{item.label}</span>
-                    {item.badge && (
-                      <span className="text-[9px] font-extrabold bg-amber-500/20 text-accent-gold px-1.5 py-0.5 rounded-full border border-amber-500/30">
-                        {item.badge}
-                      </span>
-                    )}
                   </div>
-                )}
-              </button>
-            );
-          })}
+                  {item.highlight && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-[#F5B700] border border-amber-500/30 text-[9px] font-bold tracking-wide uppercase">
+                      AI 2.0
+                    </span>
+                  )}
+                  {item.alert && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#22C55E]" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
-      {/* Footer Settings */}
-      <div className="p-3 border-t border-stroke-default space-y-1">
+      {/* Bottom Section: Settings & Upgrade Banner */}
+      <div className="space-y-3 pt-4 border-t border-white/10">
         <button
-          onClick={() => onSelectSection('settings')}
-          className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-medium ${
-            activeSection === 'settings' ? 'text-accent-gold font-bold bg-primary/20 rounded-xl' : 'text-gray-400 hover:text-white hover:bg-surface-card rounded-xl'
-          } ${isCollapsed ? 'justify-center px-0' : ''}`}
-        >
-          <Settings className="w-4 h-4 shrink-0" />
-          {!isCollapsed && <span>Settings</span>}
-        </button>
-        <button
-          onClick={() => onSelectSection('help')}
-          className={`w-full flex items-center space-x-3 px-3 py-2 text-xs font-medium text-gray-400 hover:text-white hover:bg-surface-card rounded-xl ${
-            isCollapsed ? 'justify-center px-0' : ''
+          onClick={() => onSelectTab('settings')}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+            activeTab === 'settings'
+              ? 'bg-[#F5B700]/10 text-white border border-[#F5B700]/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           }`}
         >
-          <HelpCircle className="w-4 h-4 shrink-0" />
-          {!isCollapsed && <span>Help & Support</span>}
+          <Settings className="w-4 h-4 text-slate-400" />
+          <span>Settings</span>
         </button>
+
+        {/* Upgrade Card Banner */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-[#111827] to-amber-600/5 border border-amber-500/20 relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+              <Zap className="w-3.5 h-3.5 text-[#F5B700]" />
+              <span>Memomes Pro</span>
+            </div>
+            <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
+              Unlimited
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400 leading-tight mb-3">
+            Unlock 2TB Vault, custom watermarks & Zero-Knowledge recovery.
+          </p>
+          <button 
+            onClick={() => onSelectTab('upgrade')}
+            className="w-full py-1.5 rounded-xl bg-gradient-to-r from-[#F5B700] to-amber-500 text-slate-950 font-bold text-xs hover:brightness-110 transition-all shadow-md flex items-center justify-center gap-1.5"
+          >
+            <HardDrive className="w-3 h-3" /> Upgrade Storage
+          </button>
+        </div>
       </div>
     </aside>
   );
