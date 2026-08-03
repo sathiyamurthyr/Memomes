@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   FolderPlus, ShieldCheck, Grid, List, Star, Trash2, Eye, Upload
 } from 'lucide-react';
+import { FilePreviewLightboxModal } from './FilePreviewLightboxModal';
 import { SecureShareModal } from './SecureShareModal';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
@@ -67,6 +68,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
 
   // Modals
   const [selectedFileForShare, setSelectedFileForShare] = useState<FileItem | null>(null);
+  const [selectedFileForPreview, setSelectedFileForPreview] = useState<FileItem | null>(null);
 
   // Recycle Bin / Trash collection & Activity Logs
   const [, setTrashFiles] = useState<FileItem[]>([]);
@@ -412,26 +414,36 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                         {/* File Preview — smart renderer based on file category */}
                         <div className="my-3 h-32 rounded-xl overflow-hidden bg-slate-900 border border-white/5 relative group/preview">
                           {file.category === 'video' && file.previewUrl ? (
-                            <video
-                              src={file.previewUrl}
-                              className="w-full h-full object-cover"
-                              controls
-                              preload="metadata"
-                              controlsList="nodownload"
-                              onContextMenu={e => e.preventDefault()}
-                              style={{ userSelect: 'none' }}
-                            />
+                            <div className="relative w-full h-full">
+                              <video
+                                src={file.previewUrl}
+                                className="w-full h-full object-cover"
+                                preload="metadata"
+                                controlsList="nodownload"
+                                onContextMenu={e => e.preventDefault()}
+                                style={{ userSelect: 'none' }}
+                              />
+                              <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
+                                <button
+                                  onClick={() => setSelectedFileForPreview(file)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#F5B700] text-slate-950 font-bold text-xs flex items-center gap-1 shadow-lg"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Play Video
+                                </button>
+                              </div>
+                            </div>
                           ) : file.category === 'image' && file.previewUrl ? (
                             <>
                               <img
                                 src={file.previewUrl}
                                 alt={file.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+                                onClick={() => setSelectedFileForPreview(file)}
                                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                               />
                               <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
                                 <button
-                                  onClick={() => setSelectedFileForShare(file)}
+                                  onClick={() => setSelectedFileForPreview(file)}
                                   className="px-3 py-1.5 rounded-xl bg-[#F5B700] text-slate-950 font-bold text-xs flex items-center gap-1 shadow-lg"
                                 >
                                   <Eye className="w-3.5 h-3.5" /> View Full
@@ -442,19 +454,26 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                             <img
                               src={file.previewUrl}
                               alt={file.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+                              onClick={() => setSelectedFileForPreview(file)}
                               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
                           ) : (
                             /* Document / Archive / Unknown — styled placeholder */
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-900 to-slate-800">
+                            <div
+                              className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-900 to-slate-800 cursor-pointer"
+                              onClick={() => setSelectedFileForPreview(file)}
+                            >
                               <div className="text-3xl select-none">
                                 {file.badgeType === 'PDF' ? '📄' : file.badgeType === 'DOC' ? '📝' : file.badgeType === 'ZIP' ? '🗜️' : '🔒'}
                               </div>
                               <span className="text-[10px] font-mono text-slate-400 max-w-[120px] truncate">{file.name}</span>
                               <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
                                 <button
-                                  onClick={() => setSelectedFileForShare(file)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedFileForPreview(file);
+                                  }}
                                   className="px-3 py-1.5 rounded-xl bg-[#F5B700] text-slate-950 font-bold text-xs flex items-center gap-1"
                                 >
                                   <Eye className="w-3.5 h-3.5" /> Preview
@@ -555,6 +574,16 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         onSelectTab={(tab) => setActiveTab(tab)}
         onOpenUpload={handleUploadClick}
       />
+
+      {/* Full-Screen File Preview Lightbox */}
+      {selectedFileForPreview && (
+        <FilePreviewLightboxModal
+          file={selectedFileForPreview}
+          userEmail={userEmail}
+          onClose={() => setSelectedFileForPreview(null)}
+          onOpenShare={(fileToShare) => setSelectedFileForShare(fileToShare)}
+        />
+      )}
 
       {/* Secure Share Modal */}
       {selectedFileForShare && (
