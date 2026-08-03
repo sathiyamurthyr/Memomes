@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Share2, Lock, Flame, Eye, Check, Shield, Download,
   Copy, Sliders, RefreshCw, AlertTriangle, QrCode, Globe, Clock,
-  UserCheck, Ban, Sparkles, ShieldCheck, Link2, ExternalLink
+  UserCheck, Ban, Sparkles, ShieldCheck, Link2, ExternalLink, ShieldAlert
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import type { FileItem } from './DashboardV2';
 import { ShareCodeService, type BrandedDomainType } from '../utils/shareCodeService';
 import { ShareLinkStore, type ShareLinkRecord } from '../utils/shareLinkStore';
+import { type PostLimitAction } from '../utils/shareSecurityPolicyService';
 
 interface ShareManagementPageProps {
   file: FileItem;
@@ -41,6 +42,8 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
   // Security Features
   const [enableSelfDestruct, setEnableSelfDestruct] = useState(false);
   const [passwordPin, setPasswordPin] = useState('');
+  const [maxFailedAttempts, setMaxFailedAttempts] = useState<number>(3);
+  const [postLimitAction, setPostLimitAction] = useState<PostLimitAction>('TEMP_LOCK_30M');
   const [enableAntiScreenshot, setEnableAntiScreenshot] = useState(true);
   const [allowedIpRange, setAllowedIpRange] = useState('');
   const [recipientEmailInput, setRecipientEmailInput] = useState('');
@@ -55,24 +58,28 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
   // Share Links Roster from Store
   const [fileShareLinks, setFileShareLinks] = useState<ShareLinkRecord[]>([]);
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const refreshFileLinks = () => {
+    setFileShareLinks(ShareLinkStore.getShareLinksForFile(file.id));
+  };
+
+  const handleUnlockLink = (id: string) => {
+    ShareLinkStore.resetFailedAttemptsAndUnlock(id);
+    refreshFileLinks();
+    showToast('✔ Link security lockout cleared & failed counter reset!');
+  };
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const isVideo = file.category === 'video' || file.type?.startsWith('video/') || /\.(mp4|mov|mkv|avi|webm|m4v)$/i.test(file.name);
   const isImage = file.category === 'image' || file.type?.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(file.name);
   const isPdf = file.name.endsWith('.pdf') || file.type?.includes('pdf');
 
-  // Trigger toast alert
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
   // Load existing share links for this file
-  const refreshFileLinks = () => {
-    const links = ShareLinkStore.getShareLinksForFile(file.id);
-    setFileShareLinks(links);
-  };
-
   useEffect(() => {
     refreshFileLinks();
   }, [file.id]);
@@ -135,6 +142,12 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
       accessTier,
       passwordPin: passwordPin || undefined,
       pinProtected: Boolean(passwordPin),
+      failedAttempts: 0,
+      maxFailedAttempts,
+      postLimitAction,
+      lockedUntil: null,
+      isLockedOut: false,
+      securityEvents: [],
       expiresAt: expiresAtIso,
       maxViews: maxViewsNum && !isNaN(maxViewsNum) ? maxViewsNum : null,
       currentViews: 0,
@@ -161,8 +174,9 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
   }, [
     file.id, file.name, file.size, file.type, userEmail, domainType, shareCode,
     customAlias, useCustomAlias, aliasError, accessTier, expiryOption, customExpiryDate,
-    maxViewsInput, enableSelfDestruct, passwordPin, enableWatermark, watermarkText,
-    watermarkFont, watermarkDensity, watermarkRotation, watermarkOpacity
+    maxViewsInput, enableSelfDestruct, passwordPin, maxFailedAttempts, postLimitAction,
+    enableWatermark, watermarkText, watermarkFont, watermarkDensity, watermarkRotation,
+    watermarkOpacity
   ]);
 
   // Generate Scannable High-Precision QR Code Data URL
@@ -783,20 +797,74 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
                   className="w-full h-9 px-3 rounded-xl bg-[#070B14] border border-white/10 text-white text-xs font-mono placeholder-slate-600 focus:border-[#F5B700] focus:outline-none"
                 />
               </div>
+
+              {/* Geo/IP Restriction Input */}
+              <div className="pt-1">
+                <label className="text-[11px] text-slate-400 font-mono block mb-1 flex items-center gap-1">
+                  <Globe className="w-3.5 h-3.5 text-[#F5B700]" /> Whitelisted IP / Subnet Range (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={allowedIpRange}
+                  onChange={e => setAllowedIpRange(e.target.value)}
+                  placeholder="e.g. 103.21.124.0/24 or leave blank for any IP"
+                  className="w-full h-9 px-3 rounded-xl bg-[#070B14] border border-white/10 text-white text-xs font-mono placeholder-slate-600 focus:border-[#F5B700] focus:outline-none"
+                />
+              </div>
             </div>
 
-            {/* Geo/IP Restriction Input */}
-            <div className="pt-1">
-              <label className="text-[11px] text-slate-400 font-mono block mb-1 flex items-center gap-1">
-                <Globe className="w-3.5 h-3.5 text-[#F5B700]" /> Whitelisted IP / Subnet Range (Optional)
-              </label>
-              <input
-                type="text"
-                value={allowedIpRange}
-                onChange={e => setAllowedIpRange(e.target.value)}
-                placeholder="e.g. 103.21.124.0/24 or leave blank for any IP"
-                className="w-full h-9 px-3 rounded-xl bg-[#070B14] border border-white/10 text-white text-xs font-mono placeholder-slate-600 focus:border-[#F5B700] focus:outline-none"
-              />
+            {/* Enterprise Password Lockout Policy Controls */}
+            <div className="glass-card p-5 rounded-3xl space-y-4 border border-white/10">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <label className="text-xs font-bold text-red-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-red-400" /> Password Lockout & Brute-Force Policy
+                </label>
+                <span className="text-[10px] font-mono text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/20">
+                  Failed Attempt Tracking
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                {/* Max Failed Attempts */}
+                <div>
+                  <label className="text-[11px] text-slate-300 font-mono block mb-1">Max Failed Attempts Before Lockout</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 3, label: '3 Attempts (Default)' },
+                      { value: 5, label: '5 Attempts' },
+                      { value: 10, label: '10 Attempts' }
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setMaxFailedAttempts(opt.value)}
+                        className={`py-2 rounded-xl text-xs font-mono border transition ${
+                          maxFailedAttempts === opt.value
+                            ? 'bg-red-500/20 border-red-500 text-red-400 font-bold'
+                            : 'bg-[#070B14] border-white/10 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Post-Limit Action Selector */}
+                <div>
+                  <label className="text-[11px] text-slate-300 font-mono block mb-1">Enforced Action Upon Limit Exceeded</label>
+                  <select
+                    value={postLimitAction}
+                    onChange={e => setPostLimitAction(e.target.value as PostLimitAction)}
+                    className="w-full h-9 px-3 rounded-xl bg-[#070B14] border border-white/10 text-white text-xs font-mono focus:border-[#F5B700] focus:outline-none"
+                  >
+                    <option value="TEMP_LOCK_30M">🔒 Temporary 30-Minute Lockout (Default)</option>
+                    <option value="LOCK_24H">🛑 24-Hour Security Lockout</option>
+                    <option value="PERMANENT_DISABLE">⛔ Permanently Disable Link</option>
+                    <option value="REQUIRE_MANUAL_REACTIVATION">🔑 Require Owner Manual Reactivation</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -810,7 +878,7 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
               <UserCheck className="w-5 h-5 text-[#F5B700]" /> Active Shared Access Roster & Analytics Audit Log
             </h3>
             <p className="text-xs text-slate-400 font-mono mt-0.5">
-              Monitor real-time recipient activity, track viewer IP addresses, device types, and revoke access instantly
+              Monitor real-time recipient activity, track viewer IP addresses, device types, failed PIN attempts, and clear security locks
             </p>
           </div>
 
@@ -834,17 +902,17 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
                   <th className="py-3 px-3">Share Code / Branded URL</th>
                   <th className="py-3 px-3">Access Tier</th>
                   <th className="py-3 px-3">Expires / Limit</th>
+                  <th className="py-3 px-3">Failed Attempts</th>
                   <th className="py-3 px-3">Total Views</th>
-                  <th className="py-3 px-3">Recent Viewers</th>
                   <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-3 text-right">Link Control</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {fileShareLinks.map(record => {
-                  const lastView = record.analytics[0];
                   const isRevoked = record.isRevoked;
                   const isExpired = record.isExpired || (record.expiresAt && new Date(record.expiresAt).getTime() < Date.now());
+                  const isLocked = record.isLockedOut || (record.lockedUntil && new Date(record.lockedUntil).getTime() > Date.now());
 
                   return (
                     <tr key={record.id} className="hover:bg-white/[0.02] transition-colors">
@@ -854,44 +922,51 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
                       </td>
                       <td className="py-3 px-3">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                          record.accessTier === 'VIEW_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                          record.accessTier === 'READ_DOWNLOAD' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                          'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          record.accessTier === 'VIEW_ONLY' ? 'bg-[#F5B700]/10 text-[#F5B700]' : record.accessTier === 'READ_DOWNLOAD' ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'
                         }`}>
                           {record.accessTier}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-slate-300">
-                        <div>{record.expiresAt ? new Date(record.expiresAt).toLocaleDateString() : 'Never'}</div>
+                        <div>{record.expiresAt ? new Date(record.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No Expiry'}</div>
                         <div className="text-[10px] text-slate-500">
-                          {record.maxViews ? `Max ${record.maxViews} views` : 'Unlimited views'}
+                          {record.maxViews !== null ? `Max ${record.maxViews} views` : 'Unlimited views'}
                         </div>
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-bold text-white">{record.currentViews} views</span>
-                      </td>
-                      <td className="py-3 px-3 text-slate-300">
-                        {lastView ? (
-                          <div>
-                            <div>{lastView.ipAddress} ({lastView.deviceType})</div>
-                            <div className="text-[10px] text-slate-500">{lastView.browser} · {lastView.viewedAt}</div>
-                          </div>
+                        {record.failedAttempts > 0 ? (
+                          <span className="text-red-400 font-bold bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
+                            {record.failedAttempts}/{record.maxFailedAttempts || 3} Failed
+                          </span>
                         ) : (
-                          <div className="text-slate-500 italic text-[11px]">No views yet</div>
+                          <span className="text-slate-500">0 Failed</span>
                         )}
+                      </td>
+                      <td className="py-3 px-3 text-slate-300 font-bold">
+                        {record.currentViews} Views
                       </td>
                       <td className="py-3 px-3">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 w-max ${
                           isRevoked ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
+                          isLocked ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30' :
                           isExpired ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
                           'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                         }`}>
-                          {isRevoked ? <Ban className="w-3 h-3" /> : isExpired ? <AlertTriangle className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                          {isRevoked ? 'REVOKED' : isExpired ? 'EXPIRED' : 'ACTIVE'}
+                          {isRevoked ? <Ban className="w-3 h-3" /> : isLocked ? <Lock className="w-3 h-3" /> : isExpired ? <AlertTriangle className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                          {isRevoked ? 'REVOKED' : isLocked ? 'LOCKED OUT' : isExpired ? 'EXPIRED' : 'ACTIVE'}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {(isLocked || record.failedAttempts > 0) && (
+                            <button
+                              onClick={() => handleUnlockLink(record.id)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 transition text-[11px] font-bold flex items-center gap-1"
+                              title="Clear security lockout and reset failed attempts counter"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Unlock & Reset
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               if (isRevoked) {

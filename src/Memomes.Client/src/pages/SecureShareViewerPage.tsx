@@ -90,6 +90,9 @@ export const SecureShareViewerPage: React.FC = () => {
   const [decryptedParams, setDecryptedParams] = useState<ShareParams | null>(null);
   const [targetFile, setTargetFile] = useState<VaultFile | null>(null);
   const [pwError, setPwError] = useState(false);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutMsg, setLockoutMsg] = useState<string>('');
+  const [pinAttemptsInfo, setPinAttemptsInfo] = useState<string>('');
   const [shareRecord, setShareRecord] = useState<ShareLinkRecord | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -110,6 +113,10 @@ export const SecureShareViewerPage: React.FC = () => {
             if (validation.errorCode === 'REVOKED') setIsTampered(true);
             else if (validation.errorCode === 'EXPIRED' || validation.errorCode === 'MAX_VIEWS_EXCEEDED') setIsExpired(true);
             else if (validation.errorCode === 'BURNED') setIsAlreadyBurned(true);
+            else if (validation.errorCode === 'LOCKED_OUT') {
+              setIsLockedOut(true);
+              setLockoutMsg(validation.errorMessage || 'Security Lockout Active.');
+            }
             return;
           }
 
@@ -168,30 +175,50 @@ export const SecureShareViewerPage: React.FC = () => {
 
   /* Step 3 – countdown */
   useEffect(() => {
-    if (!isUnlocked || isExpired || isAlreadyBurned || isTampered) return;
+    if (!isUnlocked || isExpired || isAlreadyBurned || isTampered || isLockedOut) return;
     const id = setInterval(() => setTimeLeft(t => {
       if (t <= 1) { clearInterval(id); setIsExpired(true); return 0; }
       return t - 1;
     }), 1000);
     return () => clearInterval(id);
-  }, [isUnlocked, isExpired, isAlreadyBurned, isTampered]);
+  }, [isUnlocked, isExpired, isAlreadyBurned, isTampered, isLockedOut]);
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAlreadyBurned) return;
+    if (isAlreadyBurned || isLockedOut) return;
     if (!password.trim()) { setPwError(true); return; }
 
     if (shareRecord) {
       const validation = ShareLinkStore.validateAccess(shareCode, password);
       if (!validation.allowed) {
-        setPwError(true);
+        if (validation.errorCode === 'PIN_REQUIRED') {
+          // Increment failed attempt counter & enforce post-limit lockout
+          const failedResult = ShareLinkStore.registerFailedAttempt(shareCode);
+          if (failedResult.isLockedOut) {
+            setIsLockedOut(true);
+            setLockoutMsg(
+              failedResult.lockedUntil
+                ? `Security Lockout: Maximum failed PIN attempts (${shareRecord.maxFailedAttempts || 3}) reached. Link is temporarily locked.`
+                : 'Security Lockout: Maximum failed PIN attempts reached. Requires manual reactivation by file owner.'
+            );
+          } else {
+            setPwError(true);
+            setPinAttemptsInfo(`Incorrect PIN. ${failedResult.remainingAttempts} attempt(s) remaining before security lockout.`);
+          }
+        } else if (validation.errorCode === 'LOCKED_OUT') {
+          setIsLockedOut(true);
+          setLockoutMsg(validation.errorMessage || 'Security Lockout Active.');
+        }
         return;
       }
+      // Successful PIN entry — reset failed counter
+      ShareLinkStore.registerSuccessfulAttempt(shareCode);
       ShareLinkStore.recordViewEvent(shareCode);
     }
 
     setIsUnlocked(true);
     setPwError(false);
+    setPinAttemptsInfo('');
     if (decryptedParams?.oneTime) localStorage.setItem(`burned_${shareCode}`, '1');
   };
 
@@ -385,6 +412,47 @@ export const SecureShareViewerPage: React.FC = () => {
     </div>
   );
 
+  /* ─── State: Security Lockout Active ─── */
+  if (!isTampered && !isAlreadyBurned && isLockedOut) return (
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#080C14' }}>
+      <MeshBg />
+      <div style={{
+        position: 'relative', zIndex: 1, width: '100%', maxWidth: 440,
+        background: 'rgba(11,15,28,0.92)', backdropFilter: 'blur(32px)',
+        border: '1px solid rgba(239,68,68,0.3)', borderRadius: 24,
+        padding: '40px 32px', textAlign: 'center',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 60px rgba(239,68,68,0.1)'
+      }} className="animate-float-up">
+        <div style={{
+          width: 72, height: 72, borderRadius: '50%', margin: '0 auto 24px',
+          background: 'radial-gradient(circle, rgba(239,68,68,0.15) 0%, transparent 70%)',
+          border: '1px solid rgba(239,68,68,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 30px rgba(239,68,68,0.25)'
+        }}>
+          <Lock style={{ width: 32, height: 32, color: '#F87171' }} />
+        </div>
+        <div className="chip chip-red" style={{ margin: '0 auto 16px', width: 'fit-content' }}>
+          SECURITY LOCKOUT ACTIVE
+        </div>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: '#F3F5FA', margin: '0 0 12px' }}>
+          Maximum Failed PIN Attempts Reached
+        </h1>
+        <p style={{ fontSize: 13, color: '#8892A4', lineHeight: 1.7, margin: 0 }}>
+          {lockoutMsg || 'This shared link has been locked due to multiple incorrect password PIN attempts.'}
+        </p>
+        <div style={{
+          marginTop: 24, padding: '14px 16px', borderRadius: 12,
+          background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)',
+          fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: '#F87171', textAlign: 'center'
+        }}>
+          ⚠️ Incident Recorded: Client IP 103.21.124.5<br />
+          File owner notified via Security Feed
+        </div>
+      </div>
+    </div>
+  );
+
   /* ─── State: Unlock Form ─── */
   if (!isTampered && !isAlreadyBurned && !isUnlocked && decryptedParams) return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#080C14' }}>
@@ -493,7 +561,7 @@ export const SecureShareViewerPage: React.FC = () => {
                 />
                 {pwError && (
                   <p style={{ fontSize: 11, color: '#F87171', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <AlertTriangle style={{ width: 12, height: 12 }} /> Please enter the decryption password.
+                    <AlertTriangle style={{ width: 12, height: 12 }} /> {pinAttemptsInfo || 'Please enter a valid decryption PIN password.'}
                   </p>
                 )}
               </div>

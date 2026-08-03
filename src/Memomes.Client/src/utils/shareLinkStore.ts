@@ -1,7 +1,8 @@
-/**
- * Enterprise ShareLink Data Store & Access Resolver for Memomes Cloud.
- * Manages persistent share link records, permissions, access validation, and view analytics.
- */
+import {
+  ShareSecurityPolicyService,
+  type PostLimitAction,
+  type SecurityNotification
+} from './shareSecurityPolicyService';
 
 export interface ShareAnalyticsEvent {
   id: string;
@@ -29,6 +30,12 @@ export interface ShareLinkRecord {
   accessTier: 'VIEW_ONLY' | 'READ_DOWNLOAD' | 'FULL_CONTROL';
   passwordPin?: string;
   pinProtected: boolean;
+  failedAttempts: number;            // Counter of failed PIN attempts
+  maxFailedAttempts: number;         // Default: 3
+  postLimitAction: PostLimitAction;   // 'TEMP_LOCK_30M' | 'LOCK_24H' | 'PERMANENT_DISABLE' | 'REQUIRE_MANUAL_REACTIVATION'
+  lockedUntil: string | null;         // ISO timestamp if locked
+  isLockedOut: boolean;
+  securityEvents: SecurityNotification[];
   expiresAt: string | null;     // ISO timestamp string or null
   maxViews: number | null;      // e.g. 5 or null (unlimited)
   currentViews: number;
@@ -52,8 +59,11 @@ export interface ShareLinkRecord {
 
 export interface AccessValidationResult {
   allowed: boolean;
-  errorCode?: 'REVOKED' | 'EXPIRED' | 'MAX_VIEWS_EXCEEDED' | 'BURNED' | 'PIN_REQUIRED' | 'NOT_FOUND';
+  errorCode?: 'REVOKED' | 'EXPIRED' | 'MAX_VIEWS_EXCEEDED' | 'BURNED' | 'PIN_REQUIRED' | 'LOCKED_OUT' | 'NOT_FOUND';
   errorMessage?: string;
+  remainingAttempts?: number;
+  lockedUntil?: string | null;
+  postLimitAction?: PostLimitAction;
   record?: ShareLinkRecord;
 }
 
@@ -156,7 +166,7 @@ export class ShareLinkStore {
   }
 
   /**
-   * Validate access to a share link based on security policies
+   * Validate access to a share link based on security policies & failed attempt lockouts
    */
   static validateAccess(codeOrAlias: string, providedPin?: string): AccessValidationResult {
     const record = this.getShareLinkByCode(codeOrAlias);
@@ -175,6 +185,38 @@ export class ShareLinkStore {
         errorMessage: 'This share link has been revoked by the file owner.',
         record
       };
+    }
+
+    // Check Lockout Status & Expiry
+    if (record.isLockedOut || record.lockedUntil) {
+      if (record.lockedUntil) {
+        const lockExpiryTime = new Date(record.lockedUntil).getTime();
+        if (Date.now() >= lockExpiryTime) {
+          // Lockout window has passed — auto unlock
+          record.isLockedOut = false;
+          record.lockedUntil = null;
+          record.failedAttempts = 0;
+          this.saveShareLink(record);
+        } else {
+          const minutesLeft = Math.ceil((lockExpiryTime - Date.now()) / (1000 * 60));
+          return {
+            allowed: false,
+            errorCode: 'LOCKED_OUT',
+            errorMessage: `Security Lockout: Link is temporarily locked for ${minutesLeft} more minute(s) due to multiple failed PIN attempts.`,
+            lockedUntil: record.lockedUntil,
+            postLimitAction: record.postLimitAction,
+            record
+          };
+        }
+      } else if (record.isLockedOut) {
+        return {
+          allowed: false,
+          errorCode: 'LOCKED_OUT',
+          errorMessage: 'Security Lockout: Maximum failed PIN attempts reached. This link requires manual reactivation by the file owner.',
+          postLimitAction: record.postLimitAction,
+          record
+        };
+      }
     }
 
     // Check expiration timestamp
@@ -223,16 +265,127 @@ export class ShareLinkStore {
         };
       }
       if (providedPin.trim() !== record.passwordPin.trim()) {
+        const remaining = Math.max(0, (record.maxFailedAttempts || 3) - (record.failedAttempts + 1));
         return {
           allowed: false,
           errorCode: 'PIN_REQUIRED',
-          errorMessage: 'Incorrect PIN password.',
+          errorMessage: `Incorrect PIN password. ${remaining} attempt(s) remaining before security lockout.`,
+          remainingAttempts: remaining,
           record
         };
       }
     }
 
     return { allowed: true, record };
+  }
+
+  /**
+   * Register a failed PIN attempt, increment counter, enforce post-limit security actions
+   */
+  static registerFailedAttempt(codeOrAlias: string, userAgentStr?: string): {
+    remainingAttempts: number;
+    isLockedOut: boolean;
+    postLimitAction: PostLimitAction;
+    lockedUntil: string | null;
+  } {
+    const record = this.getShareLinkByCode(codeOrAlias);
+    const maxAttempts = record?.maxFailedAttempts || 3;
+    const postAction = record?.postLimitAction || 'TEMP_LOCK_30M';
+
+    if (!record) {
+      return { remainingAttempts: 0, isLockedOut: false, postLimitAction: postAction, lockedUntil: null };
+    }
+
+    record.failedAttempts += 1;
+    const remainingAttempts = Math.max(0, maxAttempts - record.failedAttempts);
+
+    if (record.failedAttempts >= maxAttempts) {
+      record.isLockedOut = true;
+
+      const now = new Date();
+      if (postAction === 'TEMP_LOCK_30M') {
+        const unlockTime = new Date(now.getTime() + 30 * 60 * 1000);
+        record.lockedUntil = unlockTime.toISOString();
+      } else if (postAction === 'LOCK_24H') {
+        const unlockTime = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        record.lockedUntil = unlockTime.toISOString();
+      } else if (postAction === 'PERMANENT_DISABLE') {
+        record.isRevoked = true;
+        record.lockedUntil = null;
+      } else if (postAction === 'REQUIRE_MANUAL_REACTIVATION') {
+        record.lockedUntil = null;
+      }
+
+      // Create Security Notification
+      const ua = userAgentStr || (typeof navigator !== 'undefined' ? navigator.userAgent : '');
+      let deviceType = 'Desktop';
+      if (/Mobile|iPhone|Android/i.test(ua)) deviceType = 'Mobile';
+
+      let browser = 'Chrome';
+      if (/Firefox/i.test(ua)) browser = 'Firefox';
+      else if (/Safari/i.test(ua)) browser = 'Safari';
+
+      const secEvent: SecurityNotification = {
+        id: `sec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        shareCode: record.shareCode,
+        fileName: record.fileName,
+        fileOwner: record.createdBy,
+        failedAttempts: record.failedAttempts,
+        maxAttempts,
+        ipAddress: '103.21.124.5',
+        deviceType,
+        browser,
+        os: 'Windows',
+        actionTaken: postAction,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isRead: false
+      };
+
+      if (!record.securityEvents) record.securityEvents = [];
+      record.securityEvents.unshift(secEvent);
+
+      ShareSecurityPolicyService.dispatchNotification(secEvent);
+    }
+
+    this.saveShareLink(record);
+
+    return {
+      remainingAttempts,
+      isLockedOut: record.isLockedOut,
+      postLimitAction: record.postLimitAction,
+      lockedUntil: record.lockedUntil
+    };
+  }
+
+  /**
+   * Reset failed attempt counter to zero upon successful PIN entry
+   */
+  static registerSuccessfulAttempt(codeOrAlias: string): void {
+    const record = this.getShareLinkByCode(codeOrAlias);
+    if (record) {
+      record.failedAttempts = 0;
+      record.isLockedOut = false;
+      record.lockedUntil = null;
+      this.saveShareLink(record);
+    }
+  }
+
+  /**
+   * Owner action: Manually unlock link and reset security counter
+   */
+  static resetFailedAttemptsAndUnlock(idOrCode: string): boolean {
+    const records = this.getAllShareLinks();
+    const target = records.find(r => r.id === idOrCode || r.shareCode === idOrCode);
+    if (target) {
+      target.failedAttempts = 0;
+      target.isLockedOut = false;
+      target.lockedUntil = null;
+      target.isRevoked = false;
+      target.updatedAt = new Date().toISOString();
+      this.saveAllShareLinks(records);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -265,7 +418,7 @@ export class ShareLinkStore {
     const event: ShareAnalyticsEvent = {
       id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       viewedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      ipAddress: '103.21.124.5', // Standard mock client IP or real IP
+      ipAddress: '103.21.124.5',
       country: 'US',
       deviceType,
       browser,
@@ -273,6 +426,7 @@ export class ShareLinkStore {
     };
 
     record.currentViews += 1;
+    if (!record.analytics) record.analytics = [];
     record.analytics.unshift(event);
     record.updatedAt = new Date().toISOString();
 
