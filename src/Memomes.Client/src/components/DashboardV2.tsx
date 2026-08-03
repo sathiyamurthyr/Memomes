@@ -138,21 +138,26 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
     try {
       const stored = LocalVaultDb.getAllFiles();
       if (stored && stored.length > 0) {
-        const mapped: FileItem[] = stored.map(s => ({
-          id: s.id,
-          name: s.name,
-          size: s.size || '1.2 MB',
-          type: s.type || 'Encrypted Payload',
-          updatedAt: s.updatedAt || 'Recently',
-          isFavorite: false,
-          sharesCount: 0,
-          fileNameEncrypted: s.fileNameEncrypted || `${s.id.slice(0, 8)}.enc`,
-          previewUrl: s.dataUrl || (s.type.includes('image') || s.type.includes('video') ? s.dataUrl : undefined),
-          category: s.category || (s.type.includes('image') ? 'image' : s.type.includes('video') ? 'video' : 'document'),
-          badgeColor: '#F5B700',
-          badgeType: 'FILE',
-          b2Synced: s.b2Synced || false
-        }));
+        const mapped: FileItem[] = stored.map(s => {
+            const isVideo = s.category === 'video' || s.type?.startsWith('video/') || /\.(mp4|mov|mkv|avi|webm|m4v)$/i.test(s.name);
+            const isImage = s.category === 'image' || s.type?.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(s.name);
+            const ext = s.name?.split('.').pop()?.toUpperCase() || 'FILE';
+            return {
+              id: s.id,
+              name: s.name,
+              size: s.size || '1.2 MB',
+              type: s.type || 'Encrypted Payload',
+              updatedAt: s.updatedAt || 'Recently',
+              isFavorite: false,
+              sharesCount: 0,
+              fileNameEncrypted: s.fileNameEncrypted || `${s.id.slice(0, 8)}.enc`,
+              previewUrl: s.dataUrl,
+              category: isVideo ? 'video' : isImage ? 'image' : (s.category || 'document'),
+              badgeColor: isVideo ? '#8B5CF6' : isImage ? '#22C55E' : '#EF4444',
+              badgeType: isVideo ? ext : isImage ? 'IMG' : ext,
+              b2Synced: s.b2Synced || false
+            };
+          });
 
         setFiles(prev => {
           const prevIds = new Set(prev.map(p => p.id));
@@ -195,44 +200,78 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   const handleUploadClick = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'video/*,image/*,application/pdf,.doc,.docx,.zip';
+    input.accept = 'video/*,image/*,application/pdf,.doc,.docx,.zip,.avi,.webm,.mkv,.mov,.mp4';
     input.onchange = (e: any) => {
       const file = e.target.files?.[0];
       if (file) {
         const fileId = `file-${Date.now()}`;
-        const isVideo = file.type.includes('video') || file.name.endsWith('.mp4') || file.name.endsWith('.mov') || file.name.endsWith('.mkv');
-        const isImage = file.type.includes('image');
-        
-        const reader = new FileReader();
-        reader.onload = (event: any) => {
-          const dataUrl = event.target?.result as string || '';
+        const isVideo = file.type.startsWith('video/') ||
+          /\.(mp4|mov|mkv|avi|webm|m4v|ogv|flv|wmv)$/i.test(file.name);
+        const isImage = file.type.startsWith('image/') ||
+          /\.(png|jpg|jpeg|gif|webp|svg|bmp|ico|avif)$/i.test(file.name);
+
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+        const badgeType = isVideo
+          ? file.name.split('.').pop()?.toUpperCase() || 'MP4'
+          : isImage ? 'IMG' : file.name.split('.').pop()?.toUpperCase() || 'DOC';
+
+        if (isVideo) {
+          // For video: use createObjectURL for instant preview — no base64 overhead
+          const objectUrl = URL.createObjectURL(file);
           const newFileItem: FileItem = {
             id: fileId,
             name: file.name,
-            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-            type: isVideo ? 'Videos' : isImage ? 'Images' : 'Documents',
+            size: `${fileSizeMB} MB`,
+            type: file.type || 'video/mp4',
             updatedAt: 'Just now',
             isFavorite: false,
             sharesCount: 0,
             fileNameEncrypted: `${Math.random().toString(36).slice(2, 10)}.enc`,
-            category: isVideo ? 'video' : isImage ? 'image' : 'document',
-            previewUrl: dataUrl,
-            badgeColor: isVideo ? '#8B5CF6' : isImage ? '#22C55E' : '#EF4444',
-            badgeType: isVideo ? 'MP4' : isImage ? 'IMG' : 'DOC',
+            category: 'video',
+            previewUrl: objectUrl,
+            badgeColor: '#8B5CF6',
+            badgeType,
             b2Synced: false
           };
 
-          LocalVaultDb.saveFile(fileId, file.name, file.type, dataUrl, newFileItem);
+          // Save metadata to vault (without huge dataUrl for video — too large for localStorage)
+          LocalVaultDb.saveFile(fileId, file.name, file.type || 'video/mp4', objectUrl, newFileItem);
           setFiles(prev => [newFileItem, ...prev]);
-
-          addActivityLog('FILE_UPLOADED', `Uploaded & Encrypted ${file.name} (${newFileItem.size})`, 'Encrypted');
-
+          addActivityLog('FILE_UPLOADED', `Uploaded & Encrypted ${file.name} (${fileSizeMB} MB)`, 'Encrypted');
+          // Trigger sync — for video we rely on the presigned URL / direct B2 upload
           b2SyncWorker.triggerSync(`Upload: ${file.name}`);
-        };
-        reader.readAsDataURL(file);
+        } else {
+          // For images & documents: read as DataURL for persistent storage
+          const reader = new FileReader();
+          reader.onload = (event: any) => {
+            const dataUrl = event.target?.result as string || '';
+            const newFileItem: FileItem = {
+              id: fileId,
+              name: file.name,
+              size: `${fileSizeMB} MB`,
+              type: file.type || 'application/octet-stream',
+              updatedAt: 'Just now',
+              isFavorite: false,
+              sharesCount: 0,
+              fileNameEncrypted: `${Math.random().toString(36).slice(2, 10)}.enc`,
+              category: isImage ? 'image' : 'document',
+              previewUrl: dataUrl,
+              badgeColor: isImage ? '#22C55E' : '#EF4444',
+              badgeType,
+              b2Synced: false
+            };
+
+            LocalVaultDb.saveFile(fileId, file.name, file.type, dataUrl, newFileItem);
+            setFiles(prev => [newFileItem, ...prev]);
+            addActivityLog('FILE_UPLOADED', `Uploaded & Encrypted ${file.name} (${fileSizeMB} MB)`, 'Encrypted');
+            b2SyncWorker.triggerSync(`Upload: ${file.name}`);
+          };
+          reader.readAsDataURL(file);
+        }
       }
     };
     input.click();
+
   };
 
   const toggleFavorite = (id: string) => {
@@ -370,20 +409,60 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                           </button>
                         </div>
 
-                        {/* File Preview */}
-                        {file.previewUrl && (
-                          <div className="my-3 h-28 rounded-xl overflow-hidden bg-slate-900 border border-white/5 relative">
-                            <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                            <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <button
-                                onClick={() => setSelectedFileForShare(file)}
-                                className="px-3 py-1.5 rounded-xl bg-[#F5B700] text-slate-950 font-bold text-xs flex items-center gap-1 shadow-lg"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> Quick Preview
-                              </button>
+                        {/* File Preview — smart renderer based on file category */}
+                        <div className="my-3 h-32 rounded-xl overflow-hidden bg-slate-900 border border-white/5 relative group/preview">
+                          {file.category === 'video' && file.previewUrl ? (
+                            <video
+                              src={file.previewUrl}
+                              className="w-full h-full object-cover"
+                              controls
+                              preload="metadata"
+                              controlsList="nodownload"
+                              onContextMenu={e => e.preventDefault()}
+                              style={{ userSelect: 'none' }}
+                            />
+                          ) : file.category === 'image' && file.previewUrl ? (
+                            <>
+                              <img
+                                src={file.previewUrl}
+                                alt={file.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                              />
+                              <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
+                                <button
+                                  onClick={() => setSelectedFileForShare(file)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#F5B700] text-slate-950 font-bold text-xs flex items-center gap-1 shadow-lg"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> View Full
+                                </button>
+                              </div>
+                            </>
+                          ) : file.previewUrl && (file.type?.includes('image') || file.name?.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) ? (
+                            <img
+                              src={file.previewUrl}
+                              alt={file.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            /* Document / Archive / Unknown — styled placeholder */
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-900 to-slate-800">
+                              <div className="text-3xl select-none">
+                                {file.badgeType === 'PDF' ? '📄' : file.badgeType === 'DOC' ? '📝' : file.badgeType === 'ZIP' ? '🗜️' : '🔒'}
+                              </div>
+                              <span className="text-[10px] font-mono text-slate-400 max-w-[120px] truncate">{file.name}</span>
+                              <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
+                                <button
+                                  onClick={() => setSelectedFileForShare(file)}
+                                  className="px-3 py-1.5 rounded-xl bg-[#F5B700] text-slate-950 font-bold text-xs flex items-center gap-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Preview
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         {/* Card Actions */}
                         <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
