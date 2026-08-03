@@ -4,6 +4,7 @@ import {
   Copy, Sliders, RefreshCw, AlertTriangle, QrCode, Globe, Clock,
   UserCheck, Ban, Sparkles, ShieldCheck
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import type { FileItem } from './DashboardV2';
 import { getAppBaseUrl } from '../utils/urlHelper';
 import { ShareCrypto } from '../utils/shareCrypto';
@@ -54,6 +55,7 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
 
   // Generated Link & Feedback
   const [generatedLink, setGeneratedLink] = useState('');
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -133,6 +135,23 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
     generate();
     return () => { isMounted = false; };
   }, [file.id, accessTier, expiryOption, customExpiryDate, enableSelfDestruct, passwordPin, enableWatermark, watermarkText, watermarkFont, watermarkDensity, watermarkRotation, watermarkOpacity]);
+
+  // Generate Scannable High-Precision QR Code Data URL
+  useEffect(() => {
+    if (generatedLink) {
+      QRCode.toDataURL(generatedLink, {
+        errorCorrectionLevel: 'H',
+        margin: 2,
+        width: 360,
+        color: {
+          dark: '#070B14',
+          light: '#FFFFFF'
+        }
+      })
+        .then(url => setQrDataUrl(url))
+        .catch(err => console.warn('QR Code generation error:', err));
+    }
+  }, [generatedLink]);
 
   // Render Real-time Watermarked Image Canvas Preview
   useEffect(() => {
@@ -485,47 +504,35 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
               </button>
             </div>
 
-            {/* Mobile QR Code Dropdown with Centered Memomes Logo */}
+            {/* Mobile QR Code Dropdown with Dynamic Scannable Payload & Centered Logo */}
             {showQrCode && (
               <div className="p-4 rounded-2xl bg-[#070B14] border border-[#F5B700]/30 text-center space-y-3 animate-fade-in">
                 <div className="text-xs font-bold text-[#F5B700]">Scan with Mobile Camera to Test Access</div>
-                <div className="w-36 h-36 mx-auto bg-white p-3 rounded-2xl flex items-center justify-center shadow-2xl relative">
-                  {/* High Resolution Rendered Mobile QR Code with Center Cutout */}
-                  <svg className="w-full h-full" viewBox="0 0 100 100">
-                    {/* Top-Left Finder Pattern */}
-                    <rect x="0" y="0" width="30" height="30" fill="#070B14" rx="4" />
-                    <rect x="5" y="5" width="20" height="20" fill="#FFFFFF" rx="2" />
-                    <rect x="10" y="10" width="10" height="10" fill="#070B14" rx="1.5" />
-
-                    {/* Top-Right Finder Pattern */}
-                    <rect x="70" y="0" width="30" height="30" fill="#070B14" rx="4" />
-                    <rect x="75" y="5" width="20" height="20" fill="#FFFFFF" rx="2" />
-                    <rect x="80" y="10" width="10" height="10" fill="#070B14" rx="1.5" />
-
-                    {/* Bottom-Left Finder Pattern */}
-                    <rect x="0" y="70" width="30" height="30" fill="#070B14" rx="4" />
-                    <rect x="5" y="75" width="20" height="20" fill="#FFFFFF" rx="2" />
-                    <rect x="10" y="80" width="10" height="10" fill="#070B14" rx="1.5" />
-
-                    {/* Data Modules */}
-                    <path fill="#070B14" d="M35 5h10v10H35zM50 5h15v5H50zM5 35h10v15H5zM20 35h10v10H20zM70 35h10v15H70zM85 35h10v10H85zM35 85h10v10H35zM55 80h15v10H55zM75 70h20v10H75zM80 85h15v10H80zM35 70h5v10H35zM5 55h15v10H5zM20 50h10v15H20zM70 55h25v10H70z" />
-
-                    {/* Center Cutout Mask */}
-                    <rect x="34" y="34" width="32" height="32" fill="#FFFFFF" rx="6" />
-                  </svg>
+                <div className="w-44 h-44 mx-auto bg-white p-2.5 rounded-2xl flex items-center justify-center shadow-2xl relative">
+                  {qrDataUrl ? (
+                    <img
+                      src={qrDataUrl}
+                      alt="Scannable Share QR Code"
+                      className="w-full h-full object-contain rounded-xl"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-mono">
+                      Generating QR...
+                    </div>
+                  )}
 
                   {/* Centered Memomes Company Logo Badge */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C0143F] to-[#850E2A] p-0.5 border-2 border-white shadow-lg flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#C0143F] to-[#850E2A] p-0.5 border-2 border-white shadow-md flex items-center justify-center">
                       <div className="w-full h-full rounded-[9px] bg-[#C0143F] flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-[#FFD447]" />
+                        <ShieldCheck className="w-4.5 h-4.5 text-[#FFD447]" />
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono flex items-center justify-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  Memomes Encrypted QR · iOS & Android Compatible
+                  AES-256 Scannable QR · iOS & Android Compatible
                 </div>
               </div>
             )}
