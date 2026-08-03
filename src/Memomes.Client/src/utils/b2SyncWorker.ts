@@ -14,6 +14,7 @@
 
 import { LocalVaultDb } from './localVaultDb';
 import type { VaultFile } from './localVaultDb';
+import { StoragePathBuilder } from './storagePathBuilder';
 
 export interface B2SyncState {
   isSyncing: boolean;
@@ -24,7 +25,7 @@ export interface B2SyncState {
   targetBucket: string;
   serviceUrl: string;
   statusMessage: string;
-  b2RecordLogs: Array<{ id: string; name: string; bucket: string; b2Path: string; uploadedAt: string }>;
+  b2RecordLogs: Array<{ id: string; name: string; bucket: string; b2Path: string; b2FinalUrl?: string; uploadedAt: string }>;
 }
 
 type SyncStatusListener = (state: B2SyncState) => void;
@@ -224,14 +225,24 @@ export class B2SyncWorker {
   // ── Single File Upload ──────────────────────────────────────────────────────
 
   private async uploadSingleFile(file: VaultFile): Promise<boolean> {
-    const b2Path = `vault/sathiya/${file.id}.bin`;
+    const pathInfo = StoragePathBuilder.generateStoragePath({
+      originalFileName: file.name,
+      mimeType: file.type,
+      tenantId: file.metadata?.tenant_id || 'tenant001',
+      companyId: file.metadata?.company_id || 'company001',
+      workspaceId: file.metadata?.workspace_id || 'workspace001',
+      userId: file.metadata?.user_id || 'user001'
+    });
+
+    const b2Path = pathInfo.objectKey;
+    const b2FinalUrl = pathInfo.b2FinalUrl;
 
     try {
       // Strategy 1: Direct B2 Native API upload
       if (this.b2Auth && this.b2BucketId) {
         const uploaded = await this.uploadViaB2NativeApi(file, b2Path);
         if (uploaded) {
-          this.persistSyncedRecord(file, b2Path);
+          this.persistSyncedRecord(file, b2Path, b2FinalUrl);
           return true;
         }
       }
@@ -246,7 +257,7 @@ export class B2SyncWorker {
       // Strategy 2: Fallback — presigned URL via .NET API
       const uploaded = await this.uploadViaPresignedUrl(file, b2Path);
       if (uploaded) {
-        this.persistSyncedRecord(file, b2Path);
+        this.persistSyncedRecord(file, b2Path, b2FinalUrl);
         return true;
       }
     } catch (e: any) {
@@ -336,9 +347,11 @@ export class B2SyncWorker {
    * Atomically persist B2 sync state to localStorage.
    * MUST be called after a confirmed successful upload.
    */
-  private persistSyncedRecord(file: VaultFile, b2Path: string) {
-    // 1. Update localStorage b2Synced flag — this is what prevents re-uploads
-    LocalVaultDb.markFileAsB2Synced(file.id, b2Path, B2_BUCKET_NAME);
+  private persistSyncedRecord(file: VaultFile, b2Path: string, b2FinalUrl?: string) {
+    const finalUrl = b2FinalUrl || `https://f004.backblazeb2.com/file/${B2_BUCKET_NAME}/${b2Path}`;
+
+    // 1. Update localStorage b2Synced flag & b2FinalUrl
+    LocalVaultDb.markFileAsB2Synced(file.id, b2Path, B2_BUCKET_NAME, finalUrl);
 
     // 2. Add to visible record log
     const record = {
@@ -346,12 +359,13 @@ export class B2SyncWorker {
       name: file.name,
       bucket: B2_BUCKET_NAME,
       b2Path,
+      b2FinalUrl: finalUrl,
       uploadedAt: new Date().toLocaleTimeString()
     };
     this.state.b2RecordLogs.unshift(record);
     localStorage.setItem('memomes_b2_records', JSON.stringify(this.state.b2RecordLogs));
 
-    console.info(`[B2Sync] ✔ Uploaded: ${file.name} → ${B2_BUCKET_NAME}/${b2Path}`);
+    console.info(`[B2Sync] ✔ Uploaded: ${file.name} → ${finalUrl}`);
   }
 
   private dataUrlToBlob(dataUrl: string): Blob {
