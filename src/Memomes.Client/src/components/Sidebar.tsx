@@ -31,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'files', label: 'My Files', icon: FolderKey },
+    { id: 'share-management', label: 'Share Control Hub', icon: Share2, highlight: true },
     { id: 'shared', label: 'Shared With Me', icon: Share2, badge: sharedCount },
     { id: 'favorites', label: 'Favorites', icon: Star, badge: favoritesCount },
     { id: 'recent', label: 'Recent', icon: Clock },

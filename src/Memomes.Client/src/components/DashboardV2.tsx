@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  FolderPlus, ShieldCheck, Grid, List, Star, Trash2, Eye, Upload
+  FolderPlus, ShieldCheck, Grid, List, Star, Trash2, Eye, Upload, Share2
 } from 'lucide-react';
 import { FilePreviewLightboxModal } from './FilePreviewLightboxModal';
+import { ShareManagementPage } from './ShareManagementPage';
 import { SecureShareModal } from './SecureShareModal';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
@@ -66,9 +67,10 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Modals
+  // Modals & Navigation Views
   const [selectedFileForShare, setSelectedFileForShare] = useState<FileItem | null>(null);
   const [selectedFileForPreview, setSelectedFileForPreview] = useState<FileItem | null>(null);
+  const [selectedFileForShareManagement, setSelectedFileForShareManagement] = useState<FileItem | null>(null);
 
   // Recycle Bin / Trash collection & Activity Logs
   const [, setTrashFiles] = useState<FileItem[]>([]);
@@ -335,7 +337,10 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                 userEmail={userEmail}
                 onOpenUpload={handleUploadClick}
                 onOpenShare={() => {
-                  if (files.length > 0) setSelectedFileForShare(files[0]);
+                  if (files.length > 0) {
+                    setSelectedFileForShareManagement(files[0]);
+                    setActiveTab('share-management');
+                  }
                 }}
                 onOpenVault={() => setActiveTab('secure-vault')}
                 onOpenAskAI={() => setActiveTab('ai-intelligence')}
@@ -490,10 +495,13 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                           </span>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => setSelectedFileForShare(file)}
-                              className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 text-xs font-medium transition-colors"
+                              onClick={() => {
+                                setSelectedFileForShareManagement(file);
+                                setActiveTab('share-management');
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-[#F5B700]/15 text-[#F5B700] hover:bg-[#F5B700]/25 text-xs font-bold transition-colors flex items-center gap-1"
                             >
-                              Share
+                              <Share2 className="w-3 h-3" /> Share
                             </button>
                             <button
                               onClick={() => deleteFile(file.id)}
@@ -546,10 +554,13 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                     </div>
                     <div className="pt-2 border-t border-white/5 flex items-center justify-between">
                       <button 
-                        onClick={() => setSelectedFileForShare(file)}
-                        className="text-xs text-[#F5B700] hover:underline font-semibold"
+                        onClick={() => {
+                          setSelectedFileForShareManagement(file);
+                          setActiveTab('share-management');
+                        }}
+                        className="text-xs text-[#F5B700] hover:underline font-semibold flex items-center gap-1"
                       >
-                        Configure Sharing
+                        <Share2 className="w-3.5 h-3.5" /> Configure Sharing
                       </button>
                       <button onClick={() => deleteFile(file.id)} className="text-slate-500 hover:text-red-400">
                         <Trash2 className="w-3.5 h-3.5" />
@@ -559,6 +570,14 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                 ))}
               </div>
             </div>
+          )}
+
+          {activeTab === 'share-management' && (
+            <ShareManagementPage
+              file={selectedFileForShareManagement || files[0]}
+              userEmail={userEmail}
+              onBack={() => setActiveTab('dashboard')}
+            />
           )}
 
           {activeTab === 'ai-intelligence' && <AIIntelligencePage />}
@@ -581,7 +600,10 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
           file={selectedFileForPreview}
           userEmail={userEmail}
           onClose={() => setSelectedFileForPreview(null)}
-          onOpenShare={(fileToShare) => setSelectedFileForShare(fileToShare)}
+          onOpenShare={(fileToShare) => {
+            setSelectedFileForShareManagement(fileToShare);
+            setActiveTab('share-management');
+          }}
         />
       )}
 

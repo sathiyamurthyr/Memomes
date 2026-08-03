@@ -4,6 +4,7 @@ import {
   FolderKey, 
   Plus, 
   Sparkles, 
+  Share2,
   User 
 } from 'lucide-react';
 
@@ -59,6 +60,17 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       >
         <Sparkles className="w-5 h-5" />
         <span className="text-[10px] font-medium">AI</span>
+      </button>
+
+      {/* Share Control Hub Tab */}
+      <button
+        onClick={() => onSelectTab('share-management')}
+        className={`flex flex-col items-center gap-1 transition-all ${
+          activeTab === 'share-management' ? 'text-[#F5B700]' : 'text-slate-400 hover:text-slate-200'
+        }`}
+      >
+        <Share2 className="w-5 h-5" />
+        <span className="text-[10px] font-medium">Share</span>
       </button>
 
       {/* Profile Tab */}

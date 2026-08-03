@@ -46,6 +46,7 @@ export interface WatermarkConfig {
   font: string;
   density: string;
   rotation: number;
+  opacity?: number;
 }
 
 export interface ShareParams {
@@ -53,6 +54,7 @@ export interface ShareParams {
   expiry: string;
   zk: boolean;
   oneTime: boolean;
+  pin?: string | null;
   watermark: WatermarkConfig | null;
 }
 
