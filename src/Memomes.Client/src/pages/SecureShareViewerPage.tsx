@@ -85,10 +85,12 @@ export const SecureShareViewerPage: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(60);
   const [isExpired, setIsExpired] = useState(false);
   const [isTampered, setIsTampered] = useState(false);
+  const [isNotFound, setIsNotFound] = useState(false);
   const [isAlreadyBurned, setIsAlreadyBurned] = useState(false);
   const [isScreenHidden, setIsScreenHidden] = useState(false);
   const [decryptedParams, setDecryptedParams] = useState<ShareParams | null>(null);
   const [targetFile, setTargetFile] = useState<VaultFile | null>(null);
+  const [directPreviewUrl, setDirectPreviewUrl] = useState<string>('');
   const [pwError, setPwError] = useState(false);
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [lockoutMsg, setLockoutMsg] = useState<string>('');
@@ -136,9 +138,21 @@ export const SecureShareViewerPage: React.FC = () => {
           };
           setDecryptedParams(params);
 
-          // Locate underlying file in LocalVaultDb
-          const file = LocalVaultDb.getFile(record.fileId) || LocalVaultDb.getAllFiles()[0] || null;
-          if (file) setTargetFile(file);
+          // Set direct preview URL from share record (stored when link was created)
+          if (record.previewUrl) {
+            setDirectPreviewUrl(record.previewUrl);
+          }
+
+          // Also try to locate underlying file in LocalVaultDb (same-origin session)
+          const vaultFile = LocalVaultDb.getFile(record.fileId);
+          if (vaultFile) {
+            setTargetFile(vaultFile);
+          } else {
+            // Fallback: search all vault files for matching name
+            const allFiles = LocalVaultDb.getAllFiles();
+            const match = allFiles.find(f => f.name === record.fileName) || allFiles[0] || null;
+            if (match) setTargetFile(match);
+          }
 
           // If no PIN required, auto unlock & record analytics event
           if (!record.pinProtected) {
@@ -147,10 +161,14 @@ export const SecureShareViewerPage: React.FC = () => {
           }
           return;
         }
+        // Share code present but not found in store — show Not Found (not Tampered)
+        // This can happen when the store was cleared or link doesn't exist here
+        setIsNotFound(true);
+        return;
       }
 
       // Priority 2: Fallback to Encrypted Token parameter 'p'
-      if (!p) { setIsTampered(true); return; }
+      if (!p) { setIsNotFound(true); return; }
       const dp = await ShareCrypto.decryptParams(shareCode || 'demo-share-id', p);
       if (!dp) { setIsTampered(true); return; }
       setDecryptedParams(dp);
@@ -161,17 +179,11 @@ export const SecureShareViewerPage: React.FC = () => {
       setTimeLeft(t);
       setInitialTime(t);
 
-      const file = LocalVaultDb.getFile(shareCode) || LocalVaultDb.getAllFiles()[0] || null;
-      if (file) setTargetFile(file);
+      const vaultFile = LocalVaultDb.getFile(shareCode) || LocalVaultDb.getAllFiles()[0] || null;
+      if (vaultFile) setTargetFile(vaultFile);
     };
     init();
   }, [shareCode, p]);
-
-  /* Step 2 – get local file */
-  useEffect(() => {
-    const f = LocalVaultDb.getFile(shareCode);
-    if (f) setTargetFile(f);
-  }, [shareCode]);
 
   /* Step 3 – countdown */
   useEffect(() => {
@@ -321,12 +333,62 @@ export const SecureShareViewerPage: React.FC = () => {
     );
   };
 
-  const displayUrl = targetFile ? targetFile.dataUrl : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80';
-  const displayName = targetFile ? targetFile.name : 'Confidential_Document.png';
-  const displayMime = targetFile ? targetFile.type : 'image/png';
+  // File display: prefer VaultFile, then direct preview URL from share record, then placeholder
+  const displayUrl = targetFile
+    ? (targetFile.dataUrl || targetFile.b2FinalUrl || directPreviewUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80')
+    : (directPreviewUrl || (shareRecord?.previewUrl) || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80');
+  const displayName = targetFile ? targetFile.name : (shareRecord?.fileName || 'Confidential_Document.png');
+  const displayMime = targetFile ? targetFile.type : (shareRecord?.mimeType || 'image/png');
   const isViewOnly = decryptedParams?.tier === 'VIEW_ONLY';
   const tierLabel = decryptedParams?.tier === 'VIEW_ONLY' ? 'View Only' : decryptedParams?.tier === 'READ_DOWNLOAD' ? 'Download' : 'Full Control';
   const tierColor = decryptedParams?.tier === 'VIEW_ONLY' ? '#FFD447' : decryptedParams?.tier === 'READ_DOWNLOAD' ? '#3B8BEB' : '#10B981';
+
+  /* ─── State: Not Found ─── */
+  if (isNotFound) return (
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#080C14' }}>
+      <MeshBg />
+      <div style={{
+        position: 'relative', zIndex: 1, width: '100%', maxWidth: 420,
+        background: 'rgba(11,15,28,0.92)', backdropFilter: 'blur(32px)',
+        border: '1px solid rgba(59,139,235,0.25)', borderRadius: 24,
+        padding: '40px 32px', textAlign: 'center',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 60px rgba(59,139,235,0.06)'
+      }} className="animate-float-up">
+        <div style={{
+          width: 72, height: 72, borderRadius: '50%', margin: '0 auto 24px',
+          background: 'radial-gradient(circle, rgba(59,139,235,0.12) 0%, transparent 70%)',
+          border: '1px solid rgba(59,139,235,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 30px rgba(59,139,235,0.2)'
+        }}>
+          <ShieldAlert style={{ width: 32, height: 32, color: '#60A5FA' }} />
+        </div>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 99,
+          background: 'rgba(59,139,235,0.1)', border: '1px solid rgba(59,139,235,0.3)',
+          fontSize: 10, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.08em',
+          marginBottom: 16
+        }}>
+          LINK NOT FOUND
+        </div>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#F3F5FA', margin: '0 0 12px' }}>
+          Share Link Not Found
+        </h1>
+        <p style={{ fontSize: 13, color: '#8892A4', lineHeight: 1.7, margin: 0 }}>
+          This share link could not be found. It may have been deleted, or was created on a different device.
+          Ask the file owner to resend the link.
+        </p>
+        <div style={{
+          marginTop: 28, padding: '14px 16px', borderRadius: 12,
+          background: 'rgba(59,139,235,0.04)', border: '1px solid rgba(59,139,235,0.12)',
+          fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: '#4B5670', textAlign: 'left'
+        }}>
+          Share Code: {shareCode || '(none)'}<br />
+          Store: No matching record found
+        </div>
+      </div>
+    </div>
+  );
 
   /* ─── State: Tampered ─── */
   if (isTampered) return (
@@ -370,6 +432,7 @@ export const SecureShareViewerPage: React.FC = () => {
       </div>
     </div>
   );
+
 
   /* ─── State: Burned ─── */
   if (!isTampered && isAlreadyBurned) return (

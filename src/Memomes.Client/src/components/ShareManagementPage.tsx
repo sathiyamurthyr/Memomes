@@ -135,6 +135,8 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type || 'application/octet-stream',
+      // Store previewUrl so share viewer can render file content without LocalVaultDb
+      previewUrl: file.previewUrl || undefined,
       tenantId: 'tenant001',
       companyId: 'company001',
       workspaceId: 'workspace001',

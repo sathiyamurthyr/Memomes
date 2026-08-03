@@ -23,6 +23,10 @@ export interface ShareLinkRecord {
   fileName: string;
   fileSize: string;
   mimeType: string;
+  /** Direct preview URL (remote URL or base64 data URL) for rendering in the share viewer */
+  previewUrl?: string;
+  /** Raw file data URL for download (may be omitted to save space) */
+  fileDataUrl?: string;
   tenantId: string;
   companyId: string;
   workspaceId: string;
