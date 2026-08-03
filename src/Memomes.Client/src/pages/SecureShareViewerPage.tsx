@@ -604,22 +604,36 @@ export const SecureShareViewerPage: React.FC = () => {
             </div>
           )}
 
-          {/* File preview */}
+          {/* File preview — PDF iframe or Image */}
           {!isExpired && !isScreenHidden && (
-            <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '65vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-              <img
-                src={displayUrl}
-                alt="Secure Content"
-                style={{
-                  maxWidth: '100%', maxHeight: '60vh',
-                  objectFit: 'contain', borderRadius: 12,
-                  userSelect: 'none', pointerEvents: isViewOnly ? 'none' : 'auto',
-                  boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-                  display: 'block'
-                }}
-                onContextMenu={e => e.preventDefault()}
-                draggable={false}
-              />
+            <div style={{ position: 'relative', width: '100%', minHeight: '65vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              {displayMime.includes('pdf') || displayName.toLowerCase().endsWith('.pdf') || displayUrl.includes('.pdf') ? (
+                <iframe
+                  src={displayUrl}
+                  title={displayName}
+                  style={{
+                    width: '100%',
+                    height: '65vh',
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: '#FFFFFF'
+                  }}
+                />
+              ) : (
+                <img
+                  src={displayUrl}
+                  alt="Secure Content"
+                  style={{
+                    maxWidth: '100%', maxHeight: '60vh',
+                    objectFit: 'contain', borderRadius: 12,
+                    userSelect: 'none', pointerEvents: isViewOnly ? 'none' : 'auto',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+                    display: 'block'
+                  }}
+                  onContextMenu={e => e.preventDefault()}
+                  draggable={false}
+                />
+              )}
               {/* Watermark */}
               <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>{renderWatermark()}</div>
             </div>

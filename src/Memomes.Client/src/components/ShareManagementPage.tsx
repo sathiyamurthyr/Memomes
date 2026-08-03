@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Share2, Lock, Flame, Eye, Check, Shield, Download,
   Copy, Sliders, RefreshCw, AlertTriangle, QrCode, Globe, Clock,
-  UserCheck, Ban, Sparkles, FileText
+  UserCheck, Ban, Sparkles
 } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
 import { getAppBaseUrl } from '../utils/urlHelper';
@@ -324,10 +324,23 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
                     </div>
                   )}
                 </div>
+              ) : isPdf && file.previewUrl ? (
+                <div className="relative w-full h-full bg-slate-900 overflow-hidden">
+                  <iframe
+                    src={file.previewUrl}
+                    title={file.name}
+                    className="w-full h-full bg-white/95"
+                  />
+                  {enableWatermark && (
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-20deg] text-amber-400/40 text-xs font-mono font-bold select-none p-4">
+                      {watermarkText}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="p-6 text-center space-y-3 relative">
                   <div className="w-14 h-14 mx-auto rounded-2xl bg-[#F5B700]/10 border border-[#F5B700]/30 flex items-center justify-center text-[#F5B700]">
-                    {isPdf ? <FileText className="w-8 h-8" /> : <Lock className="w-8 h-8" />}
+                    <Lock className="w-8 h-8" />
                   </div>
                   <div className="font-bold text-xs text-white">{file.name}</div>
                   <div className="text-[11px] text-slate-400 font-mono">{file.size} • Encrypted Document Payload</div>

@@ -132,8 +132,17 @@ export const FilePreviewLightboxModal: React.FC<FilePreviewLightboxModalProps> =
               className="w-full max-h-[75vh] rounded-3xl object-contain"
             />
           </div>
+        ) : isPdf && file.previewUrl ? (
+          /* PDF DOCUMENT VIEWER */
+          <div className="w-full max-w-5xl h-[75vh] bg-slate-900 rounded-3xl overflow-hidden border border-white/15 shadow-2xl relative">
+            <iframe
+              src={file.previewUrl}
+              title={file.name}
+              className="w-full h-full rounded-3xl bg-white/95"
+            />
+          </div>
         ) : (
-          /* DOCUMENT / PDF / OTHER FILE PREVIEW CARD */
+          /* DOCUMENT / OTHER FILE PREVIEW CARD */
           <div className="w-full max-w-lg bg-[#0E1524] border border-white/10 rounded-3xl p-8 text-center space-y-6 shadow-2xl">
             <div className="w-20 h-20 mx-auto rounded-3xl bg-[#F5C027]/10 border border-[#F5C027]/30 flex items-center justify-center text-[#F5C027]">
               {isVideo ? <Film className="w-10 h-10" /> : isPdf ? <FileText className="w-10 h-10" /> : <Lock className="w-10 h-10" />}
