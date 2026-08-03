@@ -56,6 +56,7 @@ public static class FilesEndpoints
         [FromServices] IS3StorageService s3Storage,
         [FromServices] IAuditLoggerService auditLogger,
         [FromServices] IPreviewGeneratorService previewGenerator,
+        [FromServices] IObjectKeyGenerator objectKeyGen,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
@@ -96,7 +97,48 @@ public static class FilesEndpoints
             });
         }
 
-        var storagePath = $"vault/{input.UserId}/{fileId}.bin";
+        var keyResult = objectKeyGen.GenerateObjectKey(new ObjectKeyRequest(
+            WorkspaceType: "BUSINESS",
+            WorkspaceId: "workspace001",
+            TenantId: "tenant001",
+            CompanyId: "company001",
+            UserId: input.UserId,
+            OriginalFileName: input.FileNameEncrypted,
+            ContentType: input.ContentTypeEncrypted
+        ));
+
+        var ext = keyResult.FileType;
+        var objectId = keyResult.EncryptedObjectId;
+        var storagePath = keyResult.ObjectKey;
+
+        var storageObj = new StorageObject
+        {
+            ObjectId = objectId,
+            ObjectKey = storagePath,
+            EncryptedSize = input.SizeBytes,
+            ChecksumSha256 = input.ContentHash,
+            ChecksumSha1 = input.ContentHash.Length >= 40 ? input.ContentHash[..40] : input.ContentHash,
+            Status = "ACTIVE"
+        };
+        db.StorageObjects.Add(storageObj);
+
+        var fileMeta = new FileMetadata
+        {
+            FileId = fileId,
+            TenantId = "tenant001",
+            CompanyId = "company001",
+            WorkspaceId = "workspace001",
+            OwnerUserId = input.UserId,
+            StorageObjectId = storageObj.StorageObjectId,
+            OriginalFileName = input.FileNameEncrypted,
+            DisplayName = input.FileNameEncrypted,
+            MimeType = input.ContentTypeEncrypted,
+            Extension = ext,
+            FileSize = input.SizeBytes,
+            AiIndexStatus = "COMPLETED",
+            VirusScanStatus = "CLEAN"
+        };
+        db.FileMetadatas.Add(fileMeta);
 
         var newFile = new StoredFile
         {
@@ -129,7 +171,7 @@ public static class FilesEndpoints
             });
         }
 
-        var presignedUploadUrl = s3Storage.GeneratePresignedUploadUrl(storagePath, input.ContentTypeEncrypted, 60);
+        var presignedUploadUrl = s3Storage.GeneratePresignedUploadUrl(storagePath, input.ContentTypeEncrypted, 900);
 
         await auditLogger.LogAccessAsync(newFile.Id, input.UserId, "INIT_SINGLE_UPLOAD", context, sw);
 
@@ -218,7 +260,7 @@ public static class FilesEndpoints
         }
         await db.SaveChangesAsync();
 
-        var presignedUrl = s3Storage.GeneratePresignedDownloadUrl(file.StoragePath, 60);
+        var presignedUrl = s3Storage.GeneratePresignedDownloadUrl(file.StoragePath, file.FileNameEncrypted, 900);
 
         await auditLogger.LogAccessAsync(file.Id, userId, "PRESIGN_DOWNLOAD", context, sw);
 

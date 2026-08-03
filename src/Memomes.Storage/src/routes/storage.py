@@ -100,11 +100,12 @@ async def download_file(
         # Fetch stream from storage layer
         data, _ = await storage_svc.download_file(id)
         
+        original_name = getattr(metadata, 'original_file_name', None) or metadata.encrypted_file_name
         return StreamingResponse(
             io.BytesIO(data),
             media_type=metadata.mime_type,
             headers={
-                "Content-Disposition": f'attachment; filename="{metadata.encrypted_file_name}"',
+                "Content-Disposition": f'attachment; filename="{original_name}"',
                 "Content-Length": str(metadata.file_size)
             }
         )

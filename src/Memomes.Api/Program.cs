@@ -17,10 +17,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, o => o.UseVector());
 });
 
-// Storage Service, Audit Logger & Preview Generator
+// Storage Service, Audit Logger, Preview Generator & Object Key Generator
 builder.Services.AddSingleton<IS3StorageService, S3StorageService>();
 builder.Services.AddScoped<IAuditLoggerService, AuditLoggerService>();
 builder.Services.AddSingleton<IPreviewGeneratorService, PreviewGeneratorService>();
+builder.Services.AddSingleton<IObjectKeyGenerator, ObjectKeyGeneratorService>();
+builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 
 // Cold Storage Archiver Worker
 builder.Services.AddHostedService<ColdStorageArchiverWorker>();
@@ -30,7 +32,15 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowClient", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://localhost:3001")
+        policy.WithOrigins(
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:6523",   // Memomes Client dev server
+            "http://127.0.0.1:6523",
+            "http://127.0.0.1:5173",
+            "http://localhost:5000"
+        )
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

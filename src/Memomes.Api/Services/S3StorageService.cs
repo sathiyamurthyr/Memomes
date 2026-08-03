@@ -5,9 +5,9 @@ namespace Memomes.Api.Services;
 
 public interface IS3StorageService
 {
-    string GeneratePresignedUploadUrl(string objectKey, string contentType, int expirationSeconds = 60);
-    string GeneratePresignedDownloadUrl(string objectKey, int expirationSeconds = 60);
-    string GeneratePresignedChunkUploadUrl(string objectKey, string uploadId, int partNumber, int expirationSeconds = 60);
+    string GeneratePresignedUploadUrl(string objectKey, string contentType, int expirationSeconds = 900);
+    string GeneratePresignedDownloadUrl(string objectKey, string? originalFileName = null, int expirationSeconds = 900);
+    string GeneratePresignedChunkUploadUrl(string objectKey, string uploadId, int partNumber, int expirationSeconds = 900);
     Task<string> InitiateMultipartUploadAsync(string objectKey, string contentType);
     Task CompleteMultipartUploadAsync(string objectKey, string uploadId, List<PartETag> partETags);
     Task DeleteObjectAsync(string objectKey);
@@ -40,10 +40,10 @@ public class S3StorageService : IS3StorageService
         _s3Client = new AmazonS3Client(accessKey, secretKey, config);
     }
 
-    public string GeneratePresignedUploadUrl(string objectKey, string contentType, int expirationSeconds = 60)
+    public string GeneratePresignedUploadUrl(string objectKey, string contentType, int expirationSeconds = 900)
     {
-        // Enforce maximum expiration of 60 seconds as per specification
-        int maxExpiry = Math.Min(expirationSeconds, 60);
+        // Cap at 15 minutes (900s) — practical for most file sizes
+        int maxExpiry = Math.Min(expirationSeconds, 900);
         var request = new GetPreSignedUrlRequest
         {
             BucketName = _bucketName,
@@ -56,10 +56,10 @@ public class S3StorageService : IS3StorageService
         return _s3Client.GetPreSignedURL(request);
     }
 
-    public string GeneratePresignedDownloadUrl(string objectKey, int expirationSeconds = 60)
+    public string GeneratePresignedDownloadUrl(string objectKey, string? originalFileName = null, int expirationSeconds = 900)
     {
-        // Enforce maximum expiration of 60 seconds as per specification
-        int maxExpiry = Math.Min(expirationSeconds, 60);
+        // Cap at 15 minutes (900s)
+        int maxExpiry = Math.Min(expirationSeconds, 900);
         var request = new GetPreSignedUrlRequest
         {
             BucketName = _bucketName,
@@ -68,12 +68,17 @@ public class S3StorageService : IS3StorageService
             Expires = DateTime.UtcNow.AddSeconds(maxExpiry)
         };
 
+        if (!string.IsNullOrWhiteSpace(originalFileName))
+        {
+            request.ResponseHeaderOverrides.ContentDisposition = $"attachment; filename=\"{originalFileName}\"";
+        }
+
         return _s3Client.GetPreSignedURL(request);
     }
 
-    public string GeneratePresignedChunkUploadUrl(string objectKey, string uploadId, int partNumber, int expirationSeconds = 60)
+    public string GeneratePresignedChunkUploadUrl(string objectKey, string uploadId, int partNumber, int expirationSeconds = 900)
     {
-        int maxExpiry = Math.Min(expirationSeconds, 60);
+        int maxExpiry = Math.Min(expirationSeconds, 900);
         var request = new GetPreSignedUrlRequest
         {
             BucketName = _bucketName,

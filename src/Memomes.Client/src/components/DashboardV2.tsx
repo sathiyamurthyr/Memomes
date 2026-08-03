@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FolderPlus, ShieldCheck, Grid, List, Star, Trash2, Eye, Share2
 } from 'lucide-react';
@@ -7,6 +7,7 @@ import { ShareManagementPage } from './ShareManagementPage';
 import { SecureShareModal } from './SecureShareModal';
 import { EnterpriseUploadModal } from './EnterpriseUploadModal';
 import { EnterpriseFileExplorer } from './EnterpriseFileExplorer';
+import { FullScreenUploadOverlay } from './FullScreenUploadOverlay';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -64,6 +65,7 @@ interface DashboardV2Props {
 export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout }) => {
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [activeCategory, setActiveCategory] = useState<string | undefined>(undefined);
 
   // Search & View mode
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,12 +77,45 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   const [selectedFileForShareManagement, setSelectedFileForShareManagement] = useState<FileItem | null>(null);
   const [showEnterpriseUploadModal, setShowEnterpriseUploadModal] = useState(false);
 
+  // Full Screen Upload Experience Overlay State
+  const [showFullScreenUploadOverlay, setShowFullScreenUploadOverlay] = useState(false);
+  const [uploadOverlayFiles, setUploadOverlayFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Recycle Bin / Trash collection & Activity Logs
   const [, setTrashFiles] = useState<FileItem[]>([]);
   const [, setActivityLogs] = useState<ActivityLogEntry[]>([]);
 
   const handleUploadClick = () => {
-    setShowEnterpriseUploadModal(true);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    } else {
+      setShowEnterpriseUploadModal(true);
+    }
+  };
+
+  const handleFileSelectionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const selected = Array.from(e.target.files);
+      setUploadOverlayFiles(selected);
+      setShowFullScreenUploadOverlay(true);
+      e.target.value = '';
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      setUploadOverlayFiles(droppedFiles);
+      setShowFullScreenUploadOverlay(true);
+    }
   };
 
   // Main file collection
@@ -238,7 +273,20 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   });
 
   return (
-    <div className="min-h-screen bg-[#070B14] text-white flex flex-col selection:bg-[#F5B700] selection:text-slate-950">
+    <div
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      className="min-h-screen bg-[#070B14] text-white flex flex-col selection:bg-[#F5B700] selection:text-slate-950 relative"
+    >
+      {/* Hidden file input for triggering Full Screen Upload Experience */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelectionChange}
+        multiple
+        className="hidden"
+      />
+
       {/* Top Navbar */}
       <Navbar
         userEmail={userEmail}
@@ -253,7 +301,10 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         {/* Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
-          onSelectTab={(tab) => setActiveTab(tab)}
+          onSelectTab={(tab, categoryFilter) => {
+            setActiveTab(tab);
+            setActiveCategory(categoryFilter);
+          }}
           favoritesCount={files.filter(f => f.isFavorite).length}
           sharedCount={files.filter(f => f.sharesCount > 0).length}
         />
@@ -456,7 +507,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
             </>
           )}
 
-          {activeTab === 'files' && (
+          {(activeTab === 'files' || activeTab.startsWith('files-') || activeTab === 'shared' || activeTab === 'favorites' || activeTab === 'recent' || activeTab === 'recycle-bin') && (
             <EnterpriseFileExplorer
               userEmail={userEmail}
               onOpenUpload={() => setShowEnterpriseUploadModal(true)}
@@ -464,6 +515,8 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                 setSelectedFileForShareManagement(fileToShare);
                 setActiveTab('share-management');
               }}
+              selectedCategory={activeCategory}
+              activeTab={activeTab}
             />
           )}
 
@@ -527,6 +580,65 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
           onOpenShare={(fileToShare) => {
             setSelectedFileForShareManagement(fileToShare);
             setActiveTab('share-management');
+          }}
+        />
+      )}
+
+      {/* Premium Full-Screen Upload Overlay */}
+      {showFullScreenUploadOverlay && (
+        <FullScreenUploadOverlay
+          files={uploadOverlayFiles}
+          isOpen={showFullScreenUploadOverlay}
+          onClose={() => {
+            setShowFullScreenUploadOverlay(false);
+            setUploadOverlayFiles([]);
+          }}
+          onOpenFolder={() => {
+            setShowFullScreenUploadOverlay(false);
+            setUploadOverlayFiles([]);
+            setActiveTab('files');
+          }}
+          onUploadMore={() => {
+            setShowFullScreenUploadOverlay(false);
+            if (fileInputRef.current) {
+              setTimeout(() => fileInputRef.current?.click(), 200);
+            }
+          }}
+          onUploadSuccess={(uploadedQueue) => {
+            // Save uploaded files to LocalVaultDb
+            uploadedQueue.forEach((item) => {
+              if (item.status === 'Complete') {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  LocalVaultDb.saveFile(item.id, item.name, item.file.type, (e.target?.result as string) || '');
+                };
+                reader.readAsDataURL(item.file);
+              }
+            });
+
+            // Update main file list state
+            const newFileItems: FileItem[] = uploadedQueue
+              .filter((i) => i.status === 'Complete')
+              .map((item) => ({
+                id: item.id,
+                name: item.name,
+                size: `${(item.sizeBytes / (1024 * 1024)).toFixed(2)} MB`,
+                type: item.file.type || 'Encrypted File',
+                updatedAt: 'Just now',
+                isFavorite: false,
+                sharesCount: 0,
+                fileNameEncrypted: `${item.id.slice(0, 8)}.enc`,
+                category: item.file.type.startsWith('image/')
+                  ? 'image'
+                  : item.file.type.startsWith('video/')
+                  ? 'video'
+                  : 'document',
+                badgeColor: '#F5B700',
+                badgeType: item.name.split('.').pop()?.toUpperCase() || 'FILE',
+                b2Synced: true
+              }));
+
+            setFiles((prev) => [...newFileItems, ...prev]);
           }}
         />
       )}

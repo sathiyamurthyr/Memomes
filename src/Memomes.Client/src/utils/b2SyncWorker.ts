@@ -38,6 +38,7 @@ const B2_AUTH_URL = 'https://api.backblazeb2.com/b2api/v3/b2_authorize_account';
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface B2AuthInfo {
+  accountId: string;
   apiUrl: string;
   authorizationToken: string;
   downloadUrl: string;
@@ -233,6 +234,7 @@ export class B2SyncWorker {
 
     const data = await res.json();
     this.b2Auth = {
+      accountId: data.accountId,
       apiUrl: data.apiInfo?.storageApi?.apiUrl || data.apiUrl,
       authorizationToken: data.authorizationToken,
       downloadUrl: data.apiInfo?.storageApi?.downloadUrl || data.downloadUrl
@@ -246,16 +248,16 @@ export class B2SyncWorker {
     if (!this.b2Auth || this.b2BucketId) return;
 
     try {
-      const res = await fetch(`${this.b2Auth.apiUrl}/b2api/v3/b2_list_buckets?bucketName=${encodeURIComponent(B2_BUCKET_NAME)}`, {
+      const res = await fetch(`${this.b2Auth.apiUrl}/b2api/v3/b2_list_buckets?accountId=${encodeURIComponent(this.b2Auth.accountId)}`, {
         headers: { Authorization: this.b2Auth.authorizationToken }
       });
       if (res.ok) {
         const data = await res.json();
-        const bucket = data.buckets?.[0];
+        const bucket = (data.buckets || []).find((b: any) => b.bucketName === B2_BUCKET_NAME) || data.buckets?.[0];
         if (bucket) this.b2BucketId = bucket.bucketId;
       }
     } catch {
-      // If we can't resolve bucket ID, uploadFileToB2 will use bucket name fallback
+      // If we can't resolve bucket ID, uploadFileToB2 will use presigned URL route
     }
   }
 
@@ -350,13 +352,14 @@ export class B2SyncWorker {
   }
 
   private async uploadViaPresignedUrl(file: VaultFile, _b2Path: string): Promise<boolean> {
+    const uploadContentType = file.type || 'application/octet-stream';
     const initRes = await fetch('/api/files/init-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId: '00000000-0000-0000-0000-000000000001',
         fileNameEncrypted: file.fileNameEncrypted || `${file.id}.enc`,
-        contentTypeEncrypted: file.type || 'application/octet-stream',
+        contentTypeEncrypted: uploadContentType,
         sizeBytes: file.size ? parseFloat(file.size) * 1024 * 1024 | 0 : 1024 * 1024,
         contentHash: `sha256-${file.id}-${Date.now()}`
       })
@@ -365,17 +368,35 @@ export class B2SyncWorker {
     if (!initRes.ok) return false;
 
     const data = await initRes.json();
+    const fileId = data.fileId || data.FileId || file.id;
     const presignedUrl = data.presignedUploadUrl || data.PresignedUploadUrl;
+    const isDeduplicated = data.isDeduplicated || data.IsDeduplicated;
+
+    if (isDeduplicated) return true;
     if (!presignedUrl) return false;
 
     const blob = this.dataUrlToBlob(file.dataUrl);
     const putRes = await fetch(presignedUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      headers: { 'Content-Type': uploadContentType },
       body: blob
     });
 
-    return putRes.ok;
+    if (putRes.ok) {
+      // Call complete-upload to mark file completed in DB
+      await fetch('/api/files/complete-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileId: fileId,
+          uploadId: data.uploadId || data.UploadId || '',
+          partETags: null
+        })
+      }).catch(() => {});
+      return true;
+    }
+
+    return false;
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

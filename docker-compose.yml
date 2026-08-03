@@ -63,16 +63,15 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=db;Database=memomes;Username=memomes_user;Password=memomes_secure_password_123
-      - AWS__ServiceURL=http://minio:9000
-      - AWS__AccessKeyId=minio_admin
-      - AWS__SecretAccessKey=minio_secure_password_123
-      - AWS__BucketName=memomes
-      - AWS__Region=us-east-1
+      # --- Backblaze B2 Storage (S3-Compatible) ---
+      - AWS__ServiceURL=https://s3.us-west-004.backblazeb2.com
+      - AWS__AccessKeyId=008e0d1d842b
+      - AWS__SecretAccessKey=0030f1320724707dc33f380426ddf3371c3fedb37a
+      - AWS__BucketName=sathus-memomes-vault
+      - AWS__Region=us-west-004
       - JWT__SecretKey=MemomesZeroKnowledgeSuperSecretKey2026SecureVault!
     depends_on:
       db:
-        condition: service_healthy
-      minio:
         condition: service_healthy
 
   storage-api:
@@ -84,13 +83,19 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ENV_FILE=/app/.env
+      # --- Backblaze B2 Storage (S3-Compatible via MinIO client) ---
+      - MINIO_ENDPOINT=s3.us-west-004.backblazeb2.com
+      - MINIO_ACCESS_KEY=008e0d1d842b
+      - MINIO_SECRET_KEY=0030f1320724707dc33f380426ddf3371c3fedb37a
+      - MINIO_BUCKET=sathus-memomes-vault
+      - MINIO_SECURE=True
+      - DATABASE_URL=postgresql+asyncpg://memomes_user:memomes_secure_password_123@db:5432/memomes
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=MemomesZeroKnowledgeSuperSecretKey2026SecureVault!
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
 
 volumes:

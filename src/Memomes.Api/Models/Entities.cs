@@ -111,3 +111,79 @@ public class UserPublicKey
     public string PublicKeyPem { get; set; } = string.Empty;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEMOMES CLOUD V2 PURE OBJECT STORAGE & METADATA ENTITIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+public class StorageObject
+{
+    [Key]
+    public Guid StorageObjectId { get; set; } = Guid.NewGuid();
+    public string ObjectId { get; set; } = string.Empty; // e.g. obj_01K5F7VJX8M2Q4R6N9ABCD1234
+    public string ObjectKey { get; set; } = string.Empty; // e.g. objects/obj_01K5F7VJX8M2Q4R6N9ABCD1234.enc
+    public string BucketName { get; set; } = "sathus-memomes-vault";
+    public string Provider { get; set; } = "Backblaze B2";
+    public long EncryptedSize { get; set; }
+    public string ChecksumSha256 { get; set; } = string.Empty;
+    public string ChecksumSha1 { get; set; } = string.Empty;
+    public string EncryptionAlgorithm { get; set; } = "AES-256-GCM Zero-Knowledge";
+    public string StorageClass { get; set; } = "STANDARD";
+    public string Status { get; set; } = "ACTIVE";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class FileMetadata
+{
+    [Key]
+    public Guid FileId { get; set; } = Guid.NewGuid();
+    public string TenantId { get; set; } = "tenant001";
+    public string CompanyId { get; set; } = "company001";
+    public string WorkspaceId { get; set; } = "workspace001";
+    public Guid OwnerUserId { get; set; }
+    public Guid? FolderId { get; set; }
+    public Guid StorageObjectId { get; set; }
+    public StorageObject? StorageObject { get; set; }
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string MimeType { get; set; } = "application/octet-stream";
+    public string Extension { get; set; } = string.Empty;
+    public long FileSize { get; set; }
+    public Guid? ThumbnailObjectId { get; set; }
+    public Guid? PreviewObjectId { get; set; }
+    public string AiIndexStatus { get; set; } = "COMPLETED";
+    public string VirusScanStatus { get; set; } = "CLEAN";
+    public bool IsDeleted { get; set; } = false;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class Folder
+{
+    [Key]
+    public Guid FolderId { get; set; } = Guid.NewGuid();
+    public string TenantId { get; set; } = "tenant001";
+    public string CompanyId { get; set; } = "company001";
+    public string WorkspaceId { get; set; } = "workspace001";
+    public Guid? ParentFolderId { get; set; }
+    public string FolderName { get; set; } = string.Empty;
+    public string FolderPath { get; set; } = string.Empty;
+    public Guid CreatedBy { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class ShareLink
+{
+    [Key]
+    public Guid ShareId { get; set; } = Guid.NewGuid();
+    public string ShareCode { get; set; } = string.Empty;
+    public Guid FileId { get; set; }
+    public string? PasswordHash { get; set; }
+    public DateTime? Expiry { get; set; }
+    public int? ViewLimit { get; set; }
+    public bool DownloadPermission { get; set; } = true;
+    public bool Watermark { get; set; } = false;
+    public bool OtpRequired { get; set; } = false;
+    public string Status { get; set; } = "ACTIVE";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

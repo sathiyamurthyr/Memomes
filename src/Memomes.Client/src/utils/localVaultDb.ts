@@ -12,16 +12,27 @@ export interface EnterpriseFileMetadata {
   company_id: string;
   workspace_id: string;
   user_id: string;
+  folder_id?: string;
+  storage_object_id: string;
+  object_id: string;
   folder_path: string;
   object_key: string;
   bucket_name: string;
   storage_provider: string;
   original_file_name: string;
+  display_name: string;
+  storage_object_name: string;
   stored_file_name: string;
   extension: string;
   mime_type: string;
   file_size: number;
   checksum: string;
+  checksum_sha256?: string;
+  checksum_sha1?: string;
+  thumbnail_object_id?: string;
+  preview_object_id?: string;
+  ai_index_status: string;
+  virus_scan_status: string;
   version: number;
   encryption_status: string;
   share_status: string;
@@ -55,6 +66,39 @@ export interface VaultFile {
 const STORAGE_KEY = 'memomes_vault_files';
 
 export class LocalVaultDb {
+  /**
+   * Check if a file with the same name or size already exists in the vault
+   */
+  static isDuplicate(name: string): boolean {
+    const files = this.getAllFiles();
+    return files.some(f => f.name.toLowerCase() === name.toLowerCase());
+  }
+
+  /**
+   * Automatically generate a unique filename e.g. "document (1).pdf" if duplicate exists
+   */
+  static getUniqueFileName(name: string): string {
+    const files = this.getAllFiles();
+    const existingNames = new Set(files.map(f => f.name.toLowerCase()));
+
+    if (!existingNames.has(name.toLowerCase())) {
+      return name;
+    }
+
+    const lastDotIdx = name.lastIndexOf('.');
+    const baseName = lastDotIdx > 0 ? name.slice(0, lastDotIdx) : name;
+    const ext = lastDotIdx > 0 ? name.slice(lastDotIdx) : '';
+
+    let counter = 1;
+    let candidate = `${baseName} (${counter})${ext}`;
+    while (existingNames.has(candidate.toLowerCase())) {
+      counter++;
+      candidate = `${baseName} (${counter})${ext}`;
+    }
+
+    return candidate;
+  }
+
   static saveFile(id: string, name: string, type: string, dataUrl: string, extraData?: Partial<VaultFile>) {
     try {
       const filesStr = localStorage.getItem(STORAGE_KEY) || '[]';
@@ -81,16 +125,24 @@ export class LocalVaultDb {
           company_id: pathInfo.companyId,
           workspace_id: pathInfo.workspaceId,
           user_id: pathInfo.userId,
+          storage_object_id: `sobj-${id}`,
+          object_id: pathInfo.objectId,
           folder_path: pathInfo.folderPath,
           object_key: pathInfo.objectKey,
           bucket_name: pathInfo.b2BucketName,
           storage_provider: 'Backblaze B2',
           original_file_name: name,
-          stored_file_name: pathInfo.storedFileName,
+          display_name: name,
+          storage_object_name: pathInfo.storageObjectName,
+          stored_file_name: pathInfo.storageObjectName,
           extension: name.split('.').pop() || '',
           mime_type: type || 'application/octet-stream',
           file_size: 1024 * 1024,
-          checksum: 'sha1_pending',
+          checksum: 'sha256_pending',
+          checksum_sha256: 'sha256_pending',
+          checksum_sha1: 'sha1_pending',
+          ai_index_status: 'COMPLETED',
+          virus_scan_status: 'CLEAN',
           version: 1,
           encryption_status: 'AES-256-GCM Zero-Knowledge',
           share_status: 'PRIVATE',

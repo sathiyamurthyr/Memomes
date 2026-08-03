@@ -19,6 +19,12 @@ public class AppDbContext : DbContext
     public DbSet<OfflineAuditLog> OfflineAuditLogs => Set<OfflineAuditLog>();
     public DbSet<UserPublicKey> UserPublicKeys => Set<UserPublicKey>();
 
+    // Memomes Cloud V2 DbSets
+    public DbSet<StorageObject> StorageObjects => Set<StorageObject>();
+    public DbSet<FileMetadata> FileMetadatas => Set<FileMetadata>();
+    public DbSet<Folder> Folders => Set<Folder>();
+    public DbSet<ShareLink> ShareLinks => Set<ShareLink>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
