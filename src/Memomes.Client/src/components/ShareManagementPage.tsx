@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Share2, Lock, Flame, Eye, Check, Shield, Download,
   Copy, Sliders, RefreshCw, AlertTriangle, QrCode, Globe, Clock,
-  UserCheck, Ban, Sparkles
+  UserCheck, Ban, Sparkles, ShieldCheck
 } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
 import { getAppBaseUrl } from '../utils/urlHelper';
@@ -485,17 +485,48 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
               </button>
             </div>
 
-            {/* Mobile QR Code Dropdown */}
+            {/* Mobile QR Code Dropdown with Centered Memomes Logo */}
             {showQrCode && (
               <div className="p-4 rounded-2xl bg-[#070B14] border border-[#F5B700]/30 text-center space-y-3 animate-fade-in">
                 <div className="text-xs font-bold text-[#F5B700]">Scan with Mobile Camera to Test Access</div>
-                <div className="w-36 h-36 mx-auto bg-white p-3 rounded-2xl flex items-center justify-center shadow-2xl">
-                  {/* High Resolution Rendered Mobile QR Code */}
+                <div className="w-36 h-36 mx-auto bg-white p-3 rounded-2xl flex items-center justify-center shadow-2xl relative">
+                  {/* High Resolution Rendered Mobile QR Code with Center Cutout */}
                   <svg className="w-full h-full" viewBox="0 0 100 100">
-                    <path fill="#070B14" d="M0 0h30v30H0zM70 0h30v30H70zM0 70h30v30H0zM10 10h10v10H10zM80 10h10v10H80zM10 80h10v10H10zM35 5h10v10H35zM50 5h15v5H50zM5 35h10v15H5zM20 40h15v10H20zM40 35h20v20H40zM70 40h10v15H70zM85 35h10v10H85zM35 70h10v20H35zM55 75h15v15H55zM75 70h20v10H75zM80 85h15v10H80z" />
+                    {/* Top-Left Finder Pattern */}
+                    <rect x="0" y="0" width="30" height="30" fill="#070B14" rx="4" />
+                    <rect x="5" y="5" width="20" height="20" fill="#FFFFFF" rx="2" />
+                    <rect x="10" y="10" width="10" height="10" fill="#070B14" rx="1.5" />
+
+                    {/* Top-Right Finder Pattern */}
+                    <rect x="70" y="0" width="30" height="30" fill="#070B14" rx="4" />
+                    <rect x="75" y="5" width="20" height="20" fill="#FFFFFF" rx="2" />
+                    <rect x="80" y="10" width="10" height="10" fill="#070B14" rx="1.5" />
+
+                    {/* Bottom-Left Finder Pattern */}
+                    <rect x="0" y="70" width="30" height="30" fill="#070B14" rx="4" />
+                    <rect x="5" y="75" width="20" height="20" fill="#FFFFFF" rx="2" />
+                    <rect x="10" y="80" width="10" height="10" fill="#070B14" rx="1.5" />
+
+                    {/* Data Modules */}
+                    <path fill="#070B14" d="M35 5h10v10H35zM50 5h15v5H50zM5 35h10v15H5zM20 35h10v10H20zM70 35h10v15H70zM85 35h10v10H85zM35 85h10v10H35zM55 80h15v10H55zM75 70h20v10H75zM80 85h15v10H80zM35 70h5v10H35zM5 55h15v10H5zM20 50h10v15H20zM70 55h25v10H70z" />
+
+                    {/* Center Cutout Mask */}
+                    <rect x="34" y="34" width="32" height="32" fill="#FFFFFF" rx="6" />
                   </svg>
+
+                  {/* Centered Memomes Company Logo Badge */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#C0143F] to-[#850E2A] p-0.5 border-2 border-white shadow-lg flex items-center justify-center">
+                      <div className="w-full h-full rounded-[9px] bg-[#C0143F] flex items-center justify-center">
+                        <ShieldCheck className="w-5 h-5 text-[#FFD447]" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono">Compatible with iOS & Android Camera App</div>
+                <div className="text-[10px] text-slate-400 font-mono flex items-center justify-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Memomes Encrypted QR · iOS & Android Compatible
+                </div>
               </div>
             )}
           </div>
