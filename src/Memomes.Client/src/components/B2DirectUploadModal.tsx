@@ -18,6 +18,9 @@ export const B2DirectUploadModal: React.FC<B2DirectUploadModalProps> = ({ onClos
 
   const b2State = b2SyncWorker.getState();
 
+  const B2_KEY_ID = '008e0d1d842b';
+  const B2_APP_KEY = '0030f1320724707dc33f380426ddf3371c3fedb37a';
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
@@ -33,84 +36,96 @@ export const B2DirectUploadModal: React.FC<B2DirectUploadModalProps> = ({ onClos
     }
 
     setIsUploading(true);
-    setUploadProgress(10);
-    setStatusMessage(`Initiating zero-knowledge AES-256 stream to Backblaze bucket '${bucketName}'...`);
+    setUploadProgress(5);
+    setStatusMessage(`Authorising with Backblaze B2 (${bucketName})...`);
     setStatusType('info');
 
     try {
-      // Step 1: Initiate upload via API to get presigned URL
-      const initResponse = await fetch('/api/files/init-upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: '00000000-0000-0000-0000-000000000001',
-          fileNameEncrypted: `${selectedFile.name}.enc`,
-          contentTypeEncrypted: selectedFile.type || 'application/octet-stream',
-          sizeBytes: selectedFile.size,
-          contentHash: 'hash_' + Date.now()
-        })
+      // ── Step 1: Authorise with B2 Native API ──────────────────────────────
+      const credentials = btoa(`${B2_KEY_ID}:${B2_APP_KEY}`);
+      const authRes = await fetch('https://api.backblazeb2.com/b2api/v3/b2_authorize_account', {
+        method: 'GET',
+        headers: { Authorization: `Basic ${credentials}` }
       });
 
-      if (!initResponse.ok) {
-        throw new Error('Failed to get presigned upload URL');
-      }
+      if (!authRes.ok) throw new Error(`B2 auth failed: ${authRes.status}`);
+      const authData = await authRes.json();
+      const apiUrl = authData.apiInfo?.storageApi?.apiUrl || authData.apiUrl;
+      const authToken = authData.authorizationToken;
 
-      const initData = await initResponse.json();
-      const presignedUrl = initData.presignedUploadUrl;
-      
-      if (!presignedUrl) {
-        throw new Error('No presigned URL returned from server');
-      }
+      setUploadProgress(20);
+      setStatusMessage('B2 authorised. Resolving bucket...');
 
-      setUploadProgress(30);
-      setStatusMessage(`Uploading encrypted binary to Backblaze B2 bucket '${bucketName}'...`);
+      // ── Step 2: Get bucket ID ─────────────────────────────────────────────
+      const bucketsRes = await fetch(
+        `${apiUrl}/b2api/v3/b2_list_buckets?bucketName=${encodeURIComponent(bucketName)}`,
+        { headers: { Authorization: authToken } }
+      );
+      if (!bucketsRes.ok) throw new Error(`Could not resolve bucket: ${bucketsRes.status}`);
+      const bucketsData = await bucketsRes.json();
+      const bucketId = bucketsData.buckets?.[0]?.bucketId;
+      if (!bucketId) throw new Error(`Bucket '${bucketName}' not found. Check key permissions.`);
 
-      // Step 2: Upload the actual file bytes to the presigned S3 URL
-      const uploadResponse = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+      setUploadProgress(35);
+      setStatusMessage('Getting upload URL from B2...');
+
+      // ── Step 3: Get a B2 Upload URL ───────────────────────────────────────
+      const uploadUrlRes = await fetch(`${apiUrl}/b2api/v3/b2_get_upload_url`, {
+        method: 'POST',
+        headers: { Authorization: authToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bucketId })
+      });
+      if (!uploadUrlRes.ok) throw new Error(`b2_get_upload_url failed: ${uploadUrlRes.status}`);
+      const { uploadUrl, authorizationToken: uploadToken } = await uploadUrlRes.json();
+
+      setUploadProgress(50);
+      setStatusMessage(`Uploading '${selectedFile.name}' directly to ${bucketName}...`);
+
+      // ── Step 4: Compute SHA-1 checksum ────────────────────────────────────
+      const fileBuffer = await selectedFile.arrayBuffer();
+      let sha1 = 'do_not_verify';
+      try {
+        const hashBuffer = await crypto.subtle.digest('SHA-1', fileBuffer);
+        sha1 = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch { /* SHA-1 not available — B2 accepts do_not_verify */ }
+
+      // ── Step 5: Upload directly to B2 ─────────────────────────────────────
+      const b2FileName = `vault/sathiya/${Date.now()}-${selectedFile.name}`;
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: uploadToken,
+          'X-Bz-File-Name': encodeURIComponent(b2FileName),
+          'Content-Type': selectedFile.type || 'application/octet-stream',
+          'Content-Length': String(selectedFile.size),
+          'X-Bz-Content-Sha1': sha1
+        },
         body: selectedFile
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error(`S3 upload failed with status ${uploadResponse.status}`);
-      }
-
-      setUploadProgress(80);
-      setStatusMessage(`Verifying upload to Backblaze B2...`);
-
-      // Step 3: Complete the upload
-      if (!initData.isMultipart) {
-        await fetch('/api/files/complete-upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileId: initData.fileId,
-            uploadId: initData.uploadId || '',
-            partETags: null
-          })
-        }).catch(() => {});
+      if (!uploadRes.ok) {
+        const errBody = await uploadRes.text().catch(() => '');
+        throw new Error(`B2 upload failed (${uploadRes.status}): ${errBody}`);
       }
 
       setUploadProgress(100);
       setIsUploading(false);
       setStatusType('success');
-      setStatusMessage(`✔ Successfully uploaded '${selectedFile.name}' to Backblaze B2 bucket: ${bucketName}!`);
+      setStatusMessage(`✔ '${selectedFile.name}' uploaded to ${bucketName}/${b2FileName}`);
 
-      // Trigger B2 sync worker
+      // Trigger a full sync to mark any pending local vault files
       b2SyncWorker.triggerSync(`Direct Upload: ${selectedFile.name}`);
 
-      if (onUploadSuccess) {
-        onUploadSuccess(selectedFile.name);
-      }
+      if (onUploadSuccess) onUploadSuccess(selectedFile.name);
 
     } catch (err: any) {
       setIsUploading(false);
       setUploadProgress(0);
       setStatusType('error');
-      setStatusMessage(`Upload failed: ${err.message || 'Check Backblaze B2 application key permissions.'}`);
+      setStatusMessage(`Upload failed: ${err.message || 'Check Backblaze B2 key permissions.'}`);
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
