@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Share2, Lock, Flame, Eye, Check, Shield, Download,
   Copy, Sliders, RefreshCw, AlertTriangle, QrCode, Globe, Clock,
-  UserCheck, Ban, Sparkles, ShieldCheck, Link2
+  UserCheck, Ban, Sparkles, ShieldCheck, Link2, ExternalLink
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import type { FileItem } from './DashboardV2';
@@ -16,8 +16,8 @@ interface ShareManagementPageProps {
 }
 
 export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, userEmail, onBack }) => {
-  // Branded Domain & Base62 / Custom Alias State
-  const [domainType, setDomainType] = useState<BrandedDomainType>('SHORT_PATH');
+  // Branded Domain & Base62 / Custom Alias State (Default to LOCAL_ORIGIN for local testing)
+  const [domainType, setDomainType] = useState<BrandedDomainType>('LOCAL_ORIGIN');
   const [shareCode, setShareCode] = useState(() => ShareCodeService.generateBase62Code(7));
   const [customAlias, setCustomAlias] = useState('');
   const [useCustomAlias, setUseCustomAlias] = useState(false);
@@ -478,6 +478,16 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
                 {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{isCopied ? 'Copied' : 'Copy Link'}</span>
               </button>
+              <a
+                href={`${window.location.origin}/s/${useCustomAlias && customAlias.trim() ? customAlias.trim() : shareCode}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-xl bg-[#F5B700]/15 border border-[#F5B700]/30 hover:bg-[#F5B700]/25 text-[#F5B700] transition flex items-center gap-1 text-xs font-bold shrink-0"
+                title="Test Open Local Share Link in New Tab"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span className="hidden sm:inline">Test Link</span>
+              </a>
               <button
                 onClick={() => setShowQrCode(!showQrCode)}
                 className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-[#F5B700] transition"
