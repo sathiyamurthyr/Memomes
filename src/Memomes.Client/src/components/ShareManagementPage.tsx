@@ -2,28 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Share2, Lock, Flame, Eye, Check, Shield, Download,
   Copy, Sliders, RefreshCw, AlertTriangle, QrCode, Globe, Clock,
-  UserCheck, Ban, Sparkles, ShieldCheck
+  UserCheck, Ban, Sparkles, ShieldCheck, Link2
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import type { FileItem } from './DashboardV2';
-import { getAppBaseUrl } from '../utils/urlHelper';
-import { ShareCrypto } from '../utils/shareCrypto';
-
-interface SharedRecipientRecord {
-  id: string;
-  recipientEmail: string;
-  linkToken: string;
-  accessTier: 'VIEW_ONLY' | 'READ_DOWNLOAD' | 'FULL_CONTROL';
-  createdAt: string;
-  expiresAt: string;
-  viewCount: number;
-  lastViewedIp: string;
-  lastViewedLocation: string;
-  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
-  enableWatermark: boolean;
-  enableSelfDestruct: boolean;
-  pinProtected: boolean;
-}
+import { ShareCodeService, type BrandedDomainType } from '../utils/shareCodeService';
+import { ShareLinkStore, type ShareLinkRecord } from '../utils/shareLinkStore';
 
 interface ShareManagementPageProps {
   file: FileItem;
@@ -32,10 +16,18 @@ interface ShareManagementPageProps {
 }
 
 export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, userEmail, onBack }) => {
+  // Branded Domain & Base62 / Custom Alias State
+  const [domainType, setDomainType] = useState<BrandedDomainType>('SHORT_PATH');
+  const [shareCode, setShareCode] = useState(() => ShareCodeService.generateBase62Code(7));
+  const [customAlias, setCustomAlias] = useState('');
+  const [useCustomAlias, setUseCustomAlias] = useState(false);
+  const [aliasError, setAliasError] = useState<string | null>(null);
+
   // Access Tier & Expiry
   const [accessTier, setAccessTier] = useState<'VIEW_ONLY' | 'READ_DOWNLOAD' | 'FULL_CONTROL'>('VIEW_ONLY');
   const [expiryOption, setExpiryOption] = useState('24h');
   const [customExpiryDate, setCustomExpiryDate] = useState('');
+  const [maxViewsInput, setMaxViewsInput] = useState<string>('');
 
   // Watermark Customization
   const [enableWatermark, setEnableWatermark] = useState(true);
@@ -60,39 +52,8 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
   const [showQrCode, setShowQrCode] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Shared User Records List State
-  const [sharedRecords, setSharedRecords] = useState<SharedRecipientRecord[]>([
-    {
-      id: 'sr-101',
-      recipientEmail: 'alex.partner@enterprise.com',
-      linkToken: 's_89a1f2c4',
-      accessTier: 'VIEW_ONLY',
-      createdAt: '2 hours ago',
-      expiresAt: '22 hours left',
-      viewCount: 4,
-      lastViewedIp: '103.21.124.5',
-      lastViewedLocation: 'New York, US',
-      status: 'ACTIVE',
-      enableWatermark: true,
-      enableSelfDestruct: false,
-      pinProtected: true
-    },
-    {
-      id: 'sr-102',
-      recipientEmail: 'client-audit@firm.org',
-      linkToken: 's_3b78e901',
-      accessTier: 'READ_DOWNLOAD',
-      createdAt: '1 day ago',
-      expiresAt: 'Expired',
-      viewCount: 1,
-      lastViewedIp: '182.74.15.9',
-      lastViewedLocation: 'London, UK',
-      status: 'EXPIRED',
-      enableWatermark: true,
-      enableSelfDestruct: true,
-      pinProtected: false
-    }
-  ]);
+  // Share Links Roster from Store
+  const [fileShareLinks, setFileShareLinks] = useState<ShareLinkRecord[]>([]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -106,35 +67,103 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Generate AES Encrypted Share Link
+  // Load existing share links for this file
+  const refreshFileLinks = () => {
+    const links = ShareLinkStore.getShareLinksForFile(file.id);
+    setFileShareLinks(links);
+  };
+
   useEffect(() => {
-    let isMounted = true;
-    const generate = async () => {
-      try {
-        const baseUrl = getAppBaseUrl();
-        const token = await ShareCrypto.encryptParams(file.id, {
-          tier: accessTier,
-          expiry: expiryOption === 'custom' ? customExpiryDate : expiryOption,
-          zk: true,
-          oneTime: enableSelfDestruct,
-          pin: passwordPin || null,
-          watermark: enableWatermark ? {
-            text: watermarkText,
-            font: watermarkFont,
-            density: watermarkDensity,
-            rotation: watermarkRotation,
-            opacity: watermarkOpacity
-          } : null
-        });
-        const link = `${baseUrl}/s/${file.id}?p=${token}`;
-        if (isMounted) setGeneratedLink(link);
-      } catch (err) {
-        console.warn('Share link generation error', err);
-      }
+    refreshFileLinks();
+  }, [file.id]);
+
+  // Handle Alias Change with Validation
+  const handleCustomAliasChange = (val: string) => {
+    setCustomAlias(val);
+    if (!val.trim()) {
+      setAliasError(null);
+      return;
+    }
+    const check = ShareCodeService.validateCustomAlias(val);
+    if (!check.valid) {
+      setAliasError(check.message || 'Invalid alias');
+    } else if (ShareLinkStore.isCodeTaken(val)) {
+      setAliasError('Alias is already taken by another link.');
+    } else {
+      setAliasError(null);
+    }
+  };
+
+  // Generate Base62 Branded Short Link & Sync with ShareLinkStore
+  useEffect(() => {
+    const activeCode = (useCustomAlias && customAlias.trim() && !aliasError)
+      ? customAlias.trim()
+      : shareCode;
+
+    // Calculate expiry timestamp
+    let expiresAtIso: string | null = null;
+    if (expiryOption === '60s') {
+      expiresAtIso = new Date(Date.now() + 60_000).toISOString();
+    } else if (expiryOption === '1h') {
+      expiresAtIso = new Date(Date.now() + 3600_000).toISOString();
+    } else if (expiryOption === '24h') {
+      expiresAtIso = new Date(Date.now() + 86400_000).toISOString();
+    } else if (expiryOption === '7d') {
+      expiresAtIso = new Date(Date.now() + 7 * 86400_000).toISOString();
+    } else if (expiryOption === 'custom' && customExpiryDate) {
+      expiresAtIso = new Date(customExpiryDate).toISOString();
+    }
+
+    const maxViewsNum = maxViewsInput.trim() ? parseInt(maxViewsInput, 10) : null;
+    const brandedUrl = ShareCodeService.formatBrandedUrl(domainType, activeCode);
+
+    setGeneratedLink(brandedUrl);
+
+    // Save/Update in ShareLinkStore
+    const record: ShareLinkRecord = {
+      id: `sl-${file.id}-${activeCode}`,
+      shareCode: activeCode,
+      customAlias: useCustomAlias ? customAlias.trim() : undefined,
+      fileId: file.id,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type || 'application/octet-stream',
+      tenantId: 'tenant001',
+      companyId: 'company001',
+      workspaceId: 'workspace001',
+      createdBy: userEmail,
+      accessTier,
+      passwordPin: passwordPin || undefined,
+      pinProtected: Boolean(passwordPin),
+      expiresAt: expiresAtIso,
+      maxViews: maxViewsNum && !isNaN(maxViewsNum) ? maxViewsNum : null,
+      currentViews: 0,
+      isExpired: false,
+      isRevoked: false,
+      burnOnRead: enableSelfDestruct,
+      enableWatermark,
+      watermarkConfig: enableWatermark ? {
+        text: watermarkText,
+        font: watermarkFont,
+        density: watermarkDensity,
+        rotation: watermarkRotation,
+        opacity: watermarkOpacity
+      } : undefined,
+      domainType,
+      brandedUrl,
+      analytics: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
-    generate();
-    return () => { isMounted = false; };
-  }, [file.id, accessTier, expiryOption, customExpiryDate, enableSelfDestruct, passwordPin, enableWatermark, watermarkText, watermarkFont, watermarkDensity, watermarkRotation, watermarkOpacity]);
+
+    ShareLinkStore.saveShareLink(record);
+    refreshFileLinks();
+  }, [
+    file.id, file.name, file.size, file.type, userEmail, domainType, shareCode,
+    customAlias, useCustomAlias, aliasError, accessTier, expiryOption, customExpiryDate,
+    maxViewsInput, enableSelfDestruct, passwordPin, enableWatermark, watermarkText,
+    watermarkFont, watermarkDensity, watermarkRotation, watermarkOpacity
+  ]);
 
   // Generate Scannable High-Precision QR Code Data URL
   useEffect(() => {
@@ -220,52 +249,6 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
       showToast('✔ Link copied to clipboard!');
       setTimeout(() => setIsCopied(false), 2500);
     }
-  };
-
-  // Create & Append New Share Link to Roster
-  const handleCreateNewShare = () => {
-    const newRecord: SharedRecipientRecord = {
-      id: `sr-${Date.now()}`,
-      recipientEmail: recipientEmailInput.trim() || 'Anonymous Link Access',
-      linkToken: `s_${Math.random().toString(36).slice(2, 10)}`,
-      accessTier,
-      createdAt: 'Just now',
-      expiresAt: expiryOption === '60s' ? '60 Seconds' : expiryOption === '1h' ? '1 Hour' : expiryOption === '24h' ? '24 Hours' : '7 Days',
-      viewCount: 0,
-      lastViewedIp: 'Pending View',
-      lastViewedLocation: 'Unverified',
-      status: 'ACTIVE',
-      enableWatermark,
-      enableSelfDestruct,
-      pinProtected: Boolean(passwordPin)
-    };
-
-    setSharedRecords(prev => [newRecord, ...prev]);
-    setRecipientEmailInput('');
-    showToast('✔ New secure share link generated and recorded!');
-  };
-
-  // Toggle Access Revocation
-  const toggleRevoke = (id: string) => {
-    setSharedRecords(prev => prev.map(rec => {
-      if (rec.id === id) {
-        const newStatus = rec.status === 'REVOKED' ? 'ACTIVE' : 'REVOKED';
-        showToast(newStatus === 'REVOKED' ? '🛑 Access revoked immediately!' : '✔ Access re-activated!');
-        return { ...rec, status: newStatus };
-      }
-      return rec;
-    }));
-  };
-
-  // Extend Expiry +24 Hours
-  const extendExpiry = (id: string) => {
-    setSharedRecords(prev => prev.map(rec => {
-      if (rec.id === id) {
-        showToast('⏰ Expiry extended by +24 Hours!');
-        return { ...rec, status: 'ACTIVE', expiresAt: '24 hours left' };
-      }
-      return rec;
-    }));
   };
 
   return (
@@ -472,13 +455,13 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
         {/* ── RIGHT COLUMN (7 COLS): LINK GENERATOR & SECURITY CONTROLS ──────── */}
         <div className="lg:col-span-7 space-y-4">
           
-          {/* AES-256 Link Output Box */}
+          {/* AES-256 Branded Short Link Output Box */}
           <div className="glass-card p-5 rounded-3xl space-y-3 border border-emerald-500/30 bg-emerald-950/10">
             <div className="flex items-center justify-between text-xs text-emerald-400 font-bold">
               <span className="flex items-center gap-1.5">
-                <Check className="w-4 h-4" /> AES-256 Encrypted Share URL
+                <Check className="w-4 h-4" /> Branded Encrypted Short-Link URL
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Zero-Knowledge Token</span>
+              <span className="text-[10px] font-mono text-slate-400">Zero-Knowledge Code</span>
             </div>
 
             <div className="flex items-center gap-2 bg-[#070B14] p-2 rounded-2xl border border-white/10">
@@ -538,6 +521,96 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
             )}
           </div>
 
+          {/* Branded Domain & Base62 Short Code Generator Box */}
+          <div className="glass-card p-5 rounded-3xl space-y-4 border border-white/10">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <label className="text-xs font-bold text-[#F5B700] uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <Link2 className="w-4 h-4" /> Branded Short-Link Configuration
+              </label>
+              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                Bitly-Style Base62 Engine
+              </span>
+            </div>
+
+            {/* Domain Selector */}
+            <div className="space-y-1 text-xs">
+              <label className="text-slate-400 font-mono block mb-1">Branded Domain Style</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'SHORT_PATH', label: 'memomes.cloud/s/...', desc: 'Default Short Path' },
+                  { id: 'SHARE_SUBDOMAIN', label: 'share.memomes.cloud/...', desc: 'Branded Subdomain' },
+                  { id: 'LOCAL_ORIGIN', label: 'Local Dev Server', desc: 'Current Server Origin' }
+                ].map(dom => (
+                  <button
+                    key={dom.id}
+                    onClick={() => setDomainType(dom.id as BrandedDomainType)}
+                    className={`p-2.5 rounded-xl border text-left font-mono text-[11px] transition-all ${
+                      domainType === dom.id
+                        ? 'bg-[#F5B700]/15 border-[#F5B700] text-[#F5B700] font-bold'
+                        : 'bg-[#070B14] border-white/5 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <div>{dom.label}</div>
+                    <div className="text-[9px] text-slate-500 font-sans mt-0.5">{dom.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Base62 vs Custom Pro Alias Toggle & Input */}
+            <div className="space-y-2 pt-1 text-xs">
+              <div className="flex items-center justify-between">
+                <label className="text-slate-300 font-bold flex items-center gap-1.5 font-mono">
+                  Short Code / Custom Alias
+                </label>
+                <button
+                  onClick={() => {
+                    setUseCustomAlias(!useCustomAlias);
+                    setAliasError(null);
+                  }}
+                  className="text-[11px] text-[#F5B700] hover:underline font-mono font-bold"
+                >
+                  {useCustomAlias ? 'Use Base62 Auto Code' : '⚡ Use Custom Pro Alias'}
+                </button>
+              </div>
+
+              {useCustomAlias ? (
+                <div className="space-y-1">
+                  <input
+                    type="text"
+                    value={customAlias}
+                    onChange={e => handleCustomAliasChange(e.target.value)}
+                    placeholder="e.g. q3-financial-report"
+                    className={`w-full h-10 px-3.5 rounded-xl bg-[#070B14] border font-mono text-xs text-white focus:outline-none ${
+                      aliasError ? 'border-red-500/60' : 'border-emerald-500/50 focus:border-emerald-400'
+                    }`}
+                  />
+                  {aliasError ? (
+                    <p className="text-[10px] text-red-400 font-mono">{aliasError}</p>
+                  ) : (
+                    <p className="text-[10px] text-emerald-400 font-mono">✔ URL-safe Pro Custom Alias available</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareCode}
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#070B14] border border-white/10 font-mono font-bold text-xs text-[#F5B700] focus:outline-none"
+                  />
+                  <button
+                    onClick={() => setShareCode(ShareCodeService.generateBase62Code(7))}
+                    className="px-3 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-bold shrink-0 flex items-center gap-1.5 transition"
+                    title="Generate New Base62 Code"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-[#F5B700]" /> Regenerate Base62 Code
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Access Permissions Segmented Control */}
           <div className="glass-card p-5 rounded-3xl space-y-3 border border-white/10">
             <label className="text-xs font-bold text-[#F5B700] uppercase tracking-wider font-mono">
@@ -573,10 +646,10 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
             </div>
           </div>
 
-          {/* Link Expiration Settings */}
+          {/* Link Expiration & View Limit Settings */}
           <div className="glass-card p-5 rounded-3xl space-y-3 border border-white/10">
             <label className="text-xs font-bold text-[#F5B700] uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Clock className="w-4 h-4" /> 2. Set Expiration Timer
+              <Clock className="w-4 h-4" /> 2. Expiration & View Limits
             </label>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -614,6 +687,20 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
                 />
               </div>
             )}
+
+            {/* Maximum View Limit Input */}
+            <div className="pt-2">
+              <label className="text-[11px] text-slate-400 font-mono block mb-1">Maximum View Count Limit (Optional)</label>
+              <input
+                type="number"
+                min="1"
+                max="10000"
+                value={maxViewsInput}
+                onChange={e => setMaxViewsInput(e.target.value)}
+                placeholder="e.g. 5 views (leave blank for unlimited views)"
+                className="w-full h-9 px-3 rounded-xl bg-[#070B14] border border-white/10 text-white text-xs font-mono placeholder-slate-600 focus:border-[#F5B700] focus:outline-none"
+              />
+            </div>
           </div>
 
           {/* Advanced Security Protections Grid */}
@@ -701,18 +788,7 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
                 className="w-full h-9 px-3 rounded-xl bg-[#070B14] border border-white/10 text-white text-xs font-mono placeholder-slate-600 focus:border-[#F5B700] focus:outline-none"
               />
             </div>
-
-            {/* Generate & Record Share Link Action Button */}
-            <div className="pt-2">
-              <button
-                onClick={handleCreateNewShare}
-                className="btn-gold w-full !h-11 font-extrabold flex items-center justify-center gap-2 shadow-xl"
-              >
-                <Share2 className="w-4 h-4" /> Issue & Record Secure Share Link
-              </button>
-            </div>
           </div>
-
         </div>
       </div>
 
@@ -721,105 +797,125 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-[#F5B700]" /> Active Shared Access Roster & Viewer Audit Log
+              <UserCheck className="w-5 h-5 text-[#F5B700]" /> Active Shared Access Roster & Analytics Audit Log
             </h3>
             <p className="text-xs text-slate-400 font-mono mt-0.5">
-              Monitor real-time recipient activity, track viewer IP addresses, and revoke access instantly
+              Monitor real-time recipient activity, track viewer IP addresses, device types, and revoke access instantly
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-[#F5B700] bg-[#F5B700]/10 px-3 py-1 rounded-xl border border-[#F5B700]/20 font-bold">
-              {sharedRecords.filter(r => r.status === 'ACTIVE').length} Active Links
+              {fileShareLinks.filter(r => !r.isRevoked && !r.isExpired).length} Active Links
             </span>
           </div>
         </div>
 
-        {/* Shared Records Table / Responsive Cards */}
+        {/* Shared Records Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[700px] text-xs font-mono">
-            <thead>
-              <tr className="border-b border-white/10 text-slate-400 uppercase tracking-wider text-[10px]">
-                <th className="py-3 px-3">Recipient / Link ID</th>
-                <th className="py-3 px-3">Access Tier</th>
-                <th className="py-3 px-3">Issued / Expiry</th>
-                <th className="py-3 px-3">Views</th>
-                <th className="py-3 px-3">Last Viewer IP</th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3 text-right">Instant Revoke Control</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {sharedRecords.map(record => (
-                <tr key={record.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="py-3 px-3 font-bold text-white">
-                    <div>{record.recipientEmail}</div>
-                    <div className="text-[10px] text-slate-500">{record.linkToken}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      record.accessTier === 'VIEW_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                      record.accessTier === 'READ_DOWNLOAD' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                      'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    }`}>
-                      {record.accessTier}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-300">
-                    <div>{record.createdAt}</div>
-                    <div className="text-[10px] text-slate-500">{record.expiresAt}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className="font-bold text-white">{record.viewCount} views</span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-300">
-                    <div>{record.lastViewedIp}</div>
-                    <div className="text-[10px] text-slate-500">{record.lastViewedLocation}</div>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 w-max ${
-                      record.status === 'ACTIVE' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
-                      record.status === 'EXPIRED' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
-                      'bg-red-500/15 text-red-400 border border-red-500/30'
-                    }`}>
-                      {record.status === 'ACTIVE' ? <Check className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                      {record.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {record.status === 'EXPIRED' && (
-                        <button
-                          onClick={() => extendExpiry(record.id)}
-                          className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition text-[11px] font-bold flex items-center gap-1"
-                        >
-                          <RefreshCw className="w-3 h-3" /> Extend +24h
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => toggleRevoke(record.id)}
-                        className={`px-3 py-1 rounded-xl text-[11px] font-bold transition flex items-center gap-1 ${
-                          record.status === 'REVOKED'
-                            ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30'
-                            : 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30'
-                        }`}
-                      >
-                        {record.status === 'REVOKED' ? (
-                          <> <Check className="w-3.5 h-3.5" /> Re-Activate </>
-                        ) : (
-                          <> <Ban className="w-3.5 h-3.5" /> Revoke Access </>
-                        )}
-                      </button>
-                    </div>
-                  </td>
+          {fileShareLinks.length === 0 ? (
+            <div className="py-8 text-center text-slate-400 text-xs font-mono">
+              No short links recorded for this file yet. Issue a new branded short-link above!
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse min-w-[750px] text-xs font-mono">
+              <thead>
+                <tr className="border-b border-white/10 text-slate-400 uppercase tracking-wider text-[10px]">
+                  <th className="py-3 px-3">Share Code / Branded URL</th>
+                  <th className="py-3 px-3">Access Tier</th>
+                  <th className="py-3 px-3">Expires / Limit</th>
+                  <th className="py-3 px-3">Total Views</th>
+                  <th className="py-3 px-3">Recent Viewers</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3 text-right">Link Control</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {fileShareLinks.map(record => {
+                  const lastView = record.analytics[0];
+                  const isRevoked = record.isRevoked;
+                  const isExpired = record.isExpired || (record.expiresAt && new Date(record.expiresAt).getTime() < Date.now());
+
+                  return (
+                    <tr key={record.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-3 px-3 font-bold text-white">
+                        <div className="text-[#F5B700] font-mono">{record.shareCode}</div>
+                        <div className="text-[10px] text-slate-400 truncate max-w-[220px]">{record.brandedUrl}</div>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                          record.accessTier === 'VIEW_ONLY' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                          record.accessTier === 'READ_DOWNLOAD' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                          'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        }`}>
+                          {record.accessTier}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">
+                        <div>{record.expiresAt ? new Date(record.expiresAt).toLocaleDateString() : 'Never'}</div>
+                        <div className="text-[10px] text-slate-500">
+                          {record.maxViews ? `Max ${record.maxViews} views` : 'Unlimited views'}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="font-bold text-white">{record.currentViews} views</span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">
+                        {lastView ? (
+                          <div>
+                            <div>{lastView.ipAddress} ({lastView.deviceType})</div>
+                            <div className="text-[10px] text-slate-500">{lastView.browser} · {lastView.viewedAt}</div>
+                          </div>
+                        ) : (
+                          <div className="text-slate-500 italic text-[11px]">No views yet</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 w-max ${
+                          isRevoked ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
+                          isExpired ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
+                          'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        }`}>
+                          {isRevoked ? <Ban className="w-3 h-3" /> : isExpired ? <AlertTriangle className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                          {isRevoked ? 'REVOKED' : isExpired ? 'EXPIRED' : 'ACTIVE'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              if (isRevoked) {
+                                record.isRevoked = false;
+                                ShareLinkStore.saveShareLink(record);
+                                showToast('✔ Share link re-activated!');
+                              } else {
+                                ShareLinkStore.revokeShareLink(record.id);
+                                showToast('⛔ Share link revoked!');
+                              }
+                              refreshFileLinks();
+                            }}
+                            className={`px-3 py-1 rounded-xl text-[11px] font-bold transition flex items-center gap-1 ${
+                              isRevoked
+                                ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30'
+                                : 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30'
+                            }`}
+                          >
+                            {isRevoked ? (
+                              <> <Check className="w-3.5 h-3.5" /> Re-Activate </>
+                            ) : (
+                              <> <Ban className="w-3.5 h-3.5" /> Revoke Link </>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
-
     </div>
   );
 };

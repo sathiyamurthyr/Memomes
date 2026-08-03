@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { ShareCrypto, type ShareParams } from '../utils/shareCrypto';
 import { LocalVaultDb, type VaultFile } from '../utils/localVaultDb';
+import { ShareCodeService } from '../utils/shareCodeService';
+import { ShareLinkStore, type ShareLinkRecord } from '../utils/shareLinkStore';
 
 /* ─── helpers ─── */
 const fmt = (s: number) =>
@@ -88,35 +90,81 @@ export const SecureShareViewerPage: React.FC = () => {
   const [decryptedParams, setDecryptedParams] = useState<ShareParams | null>(null);
   const [targetFile, setTargetFile] = useState<VaultFile | null>(null);
   const [pwError, setPwError] = useState(false);
+  const [shareRecord, setShareRecord] = useState<ShareLinkRecord | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const params = new URLSearchParams(window.location.search);
-  const p = params.get('p') || '';
-  const pathParts = window.location.pathname.split('/');
-  const shareId = pathParts[pathParts.length - 1] || 'demo-share-id';
+  const searchParams = new URLSearchParams(window.location.search);
+  const p = searchParams.get('p') || '';
+  const shareCode = ShareCodeService.extractShareCodeFromLocation(window.location.pathname, searchParams);
 
-  /* Step 1 – decrypt & validate link */
+  /* Step 1 – Resolve Short Code or Decrypt Token */
   useEffect(() => {
     const init = async () => {
+      // Priority 1: Check ShareLinkStore for Branded Short Code or Custom Alias
+      if (shareCode) {
+        const record = ShareLinkStore.getShareLinkByCode(shareCode);
+        if (record) {
+          setShareRecord(record);
+          const validation = ShareLinkStore.validateAccess(shareCode);
+          if (!validation.allowed) {
+            if (validation.errorCode === 'REVOKED') setIsTampered(true);
+            else if (validation.errorCode === 'EXPIRED' || validation.errorCode === 'MAX_VIEWS_EXCEEDED') setIsExpired(true);
+            else if (validation.errorCode === 'BURNED') setIsAlreadyBurned(true);
+            return;
+          }
+
+          // Map record to ShareParams structure for UI rendering
+          const params: ShareParams = {
+            tier: record.accessTier,
+            expiry: record.expiresAt ? '24h' : '7d',
+            zk: true,
+            oneTime: record.burnOnRead,
+            pin: record.passwordPin || null,
+            watermark: record.enableWatermark ? (record.watermarkConfig || {
+              text: 'CONFIDENTIAL',
+              font: 'mono',
+              density: 'medium',
+              rotation: -15
+            }) : null
+          };
+          setDecryptedParams(params);
+
+          // Locate underlying file in LocalVaultDb
+          const file = LocalVaultDb.getFile(record.fileId) || LocalVaultDb.getAllFiles()[0] || null;
+          if (file) setTargetFile(file);
+
+          // If no PIN required, auto unlock & record analytics event
+          if (!record.pinProtected) {
+            setIsUnlocked(true);
+            ShareLinkStore.recordViewEvent(shareCode);
+          }
+          return;
+        }
+      }
+
+      // Priority 2: Fallback to Encrypted Token parameter 'p'
       if (!p) { setIsTampered(true); return; }
-      const dp = await ShareCrypto.decryptParams(shareId, p);
+      const dp = await ShareCrypto.decryptParams(shareCode || 'demo-share-id', p);
       if (!dp) { setIsTampered(true); return; }
       setDecryptedParams(dp);
-      if (dp.oneTime && localStorage.getItem(`burned_${shareId}`) === '1') {
+      if (dp.oneTime && localStorage.getItem(`burned_${shareCode}`) === '1') {
         setIsAlreadyBurned(true);
       }
       const t = dp.expiry === '60s' ? 60 : dp.expiry === '1h' ? 3600 : 86400;
       setTimeLeft(t);
       setInitialTime(t);
+
+      const file = LocalVaultDb.getFile(shareCode) || LocalVaultDb.getAllFiles()[0] || null;
+      if (file) setTargetFile(file);
     };
     init();
-  }, [shareId, p]);
+  }, [shareCode, p]);
 
   /* Step 2 – get local file */
   useEffect(() => {
-    const f = LocalVaultDb.getFile(shareId);
+    const f = LocalVaultDb.getFile(shareCode);
     if (f) setTargetFile(f);
-  }, [shareId]);
+  }, [shareCode]);
 
   /* Step 3 – countdown */
   useEffect(() => {
@@ -132,9 +180,19 @@ export const SecureShareViewerPage: React.FC = () => {
     e.preventDefault();
     if (isAlreadyBurned) return;
     if (!password.trim()) { setPwError(true); return; }
+
+    if (shareRecord) {
+      const validation = ShareLinkStore.validateAccess(shareCode, password);
+      if (!validation.allowed) {
+        setPwError(true);
+        return;
+      }
+      ShareLinkStore.recordViewEvent(shareCode);
+    }
+
     setIsUnlocked(true);
     setPwError(false);
-    if (decryptedParams?.oneTime) localStorage.setItem(`burned_${shareId}`, '1');
+    if (decryptedParams?.oneTime) localStorage.setItem(`burned_${shareCode}`, '1');
   };
 
   /* Security event hooks */
@@ -280,7 +338,7 @@ export const SecureShareViewerPage: React.FC = () => {
           fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: '#4B5670', textAlign: 'left'
         }}>
           AES-GCM-256 decryption returned NULL<br />
-          Share ID: {shareId.slice(0, 16)}...
+          Share Code: {shareCode.slice(0, 16)}...
         </div>
       </div>
     </div>
@@ -321,7 +379,7 @@ export const SecureShareViewerPage: React.FC = () => {
           fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: '#4B5670', textAlign: 'left'
         }}>
           BURN-ON-READ policy enforced<br />
-          localStorage key: burned_{shareId.slice(0, 12)}...
+          localStorage key: burned_{shareCode.slice(0, 12)}...
         </div>
       </div>
     </div>
@@ -374,7 +432,7 @@ export const SecureShareViewerPage: React.FC = () => {
               Enter Decryption Key
             </h1>
             <p style={{ fontSize: 12, color: '#8892A4', fontFamily: '"JetBrains Mono", monospace', margin: 0 }}>
-              Share ID: {shareId.slice(0, 8)}···{shareId.slice(-6)}
+              Share Code: {shareCode}
             </p>
           </div>
 
