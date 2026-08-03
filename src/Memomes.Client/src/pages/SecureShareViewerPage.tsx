@@ -202,9 +202,14 @@ export const SecureShareViewerPage: React.FC = () => {
 
   /* Watermark renderer */
   const renderWatermark = () => {
-    if (!decryptedParams?.watermark) return null;
-    const { text, font, density, rotation } = decryptedParams.watermark;
-    const count = density === 'low' ? 4 : density === 'high' ? 16 : 9;
+    const wm = decryptedParams?.watermark || {
+      text: 'RECIPIENT · 103.21.124.5',
+      font: 'mono',
+      density: 'medium',
+      rotation: -15
+    };
+    const { text, font, density, rotation } = wm;
+    const count = density === 'low' ? 6 : density === 'high' ? 20 : 12;
     const cols = density === 'low' ? 2 : density === 'high' ? 4 : 3;
     const fontMap: Record<string, string> = { mono: '"JetBrains Mono", monospace', sans: 'Inter, sans-serif', serif: 'Georgia, serif' };
     return (
@@ -212,18 +217,19 @@ export const SecureShareViewerPage: React.FC = () => {
         position: 'absolute', inset: 0, pointerEvents: 'none', userSelect: 'none',
         display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`,
         gridTemplateRows: `repeat(${Math.ceil(count / cols)}, 1fr)`,
-        zIndex: 20, opacity: 0.07
+        zIndex: 40, opacity: 0.45
       }}>
         {Array.from({ length: count }).map((_, i) => (
           <div key={i} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             transform: `rotate(${rotation}deg)`,
             fontFamily: fontMap[font] || fontMap.mono,
-            fontSize: 11, fontWeight: 700, color: 'white',
-            textAlign: 'center', lineHeight: 1.4
+            fontSize: 13, fontWeight: 800, color: '#F5B700',
+            textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.8)',
+            textAlign: 'center', lineHeight: 1.3
           }}>
-            {text}<br />
-            <span style={{ fontSize: 9, opacity: 0.8 }}>{new Date().toLocaleDateString()}</span>
+            <span>{text}</span>
+            <span style={{ fontSize: 10, opacity: 0.9, color: '#FFFFFF' }}>{new Date().toLocaleDateString()}</span>
           </div>
         ))}
       </div>
@@ -615,7 +621,7 @@ export const SecureShareViewerPage: React.FC = () => {
                 draggable={false}
               />
               {/* Watermark */}
-              {isViewOnly && <div style={{ position: 'absolute', inset: 24 }}>{renderWatermark()}</div>}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>{renderWatermark()}</div>
             </div>
           )}
 
