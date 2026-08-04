@@ -7,6 +7,7 @@ import { ShareCrypto, type ShareParams } from '../utils/shareCrypto';
 import { LocalVaultDb, type VaultFile } from '../utils/localVaultDb';
 import { ShareCodeService } from '../utils/shareCodeService';
 import { ShareLinkStore, type ShareLinkRecord } from '../utils/shareLinkStore';
+import { SecureShareLoadingScreen } from '../components/SecureShareLoadingScreen';
 
 /* ─── helpers ─── */
 const fmt = (s: number) =>
@@ -96,6 +97,7 @@ export const SecureShareViewerPage: React.FC = () => {
   const [lockoutMsg, setLockoutMsg] = useState<string>('');
   const [pinAttemptsInfo, setPinAttemptsInfo] = useState<string>('');
   const [shareRecord, setShareRecord] = useState<ShareLinkRecord | null>(null);
+  const [isLoadingScreenActive, setIsLoadingScreenActive] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -664,10 +666,24 @@ export const SecureShareViewerPage: React.FC = () => {
   );
 
   /* ─── State: Unlocked Viewer ─── */
-  if (!isTampered && !isAlreadyBurned && isUnlocked && decryptedParams) return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: '#080C14', minHeight: '100vh' }}>
-      <MeshBg />
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 880 }} className="animate-float-up">
+  if (!isTampered && !isAlreadyBurned && isUnlocked && decryptedParams) {
+    if (isLoadingScreenActive) {
+      return (
+        <SecureShareLoadingScreen
+          fileName={displayName}
+          passwordProtected={!!shareRecord?.pinProtected}
+          isPasswordVerified={true}
+          onComplete={() => setIsLoadingScreenActive(false)}
+          onRetry={() => window.location.reload()}
+          onCancel={() => window.history.back()}
+        />
+      );
+    }
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: '#080C14', minHeight: '100vh' }}>
+        <MeshBg />
+        <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 880 }} className="animate-float-up">
 
         {/* ── Header ── */}
         <div style={{
@@ -887,23 +903,15 @@ export const SecureShareViewerPage: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+    );
+  }
 
-  /* ─── Loading state ─── */
+  /* ─── Initial Link Resolving Loading state ─── */
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#080C14' }}>
-      <MeshBg />
-      <div style={{ zIndex: 1, position: 'relative', textAlign: 'center' }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%', margin: '0 auto 16px',
-          border: '2px solid #1E2535', borderTopColor: '#C0143F',
-          animation: 'spin 0.8s linear infinite'
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{ fontSize: 13, color: '#8892A4', fontFamily: '"JetBrains Mono", monospace' }}>
-          Verifying cryptographic seal…
-        </div>
-      </div>
-    </div>
+    <SecureShareLoadingScreen
+      fileName="Resolving Secure Link..."
+      onRetry={() => window.location.reload()}
+      onCancel={() => window.history.back()}
+    />
   );
 };
