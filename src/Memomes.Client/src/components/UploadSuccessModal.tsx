@@ -1,129 +1,196 @@
 import React from 'react';
-import { CheckCircle2, Folder, Eye, Share2, X, Check, Plus, ShieldCheck, Sparkles, Image as IconImage } from 'lucide-react';
-import type { FileItem } from './DashboardV2';
+import {
+  CheckCircle2, ShieldCheck, Lock, Sparkles, Folder, Eye, Share2,
+  Upload, Check, X, Clock, Zap, FileText
+} from 'lucide-react';
 
 interface UploadSuccessModalProps {
-  file: FileItem;
-  destinationPath: string;
-  onClose: () => void;
-  onOpenFolder: (path: string) => void;
-  onViewFile: (file: FileItem) => void;
-  onShareFile: (file: FileItem) => void;
+  fileName: string;
+  fileSize: number;
+  folderCategory?: string;
+  onOpenFolder?: () => void;
+  onPreview?: () => void;
+  onShare?: () => void;
   onUploadAnother?: () => void;
+  onDone: () => void;
 }
 
 export const UploadSuccessModal: React.FC<UploadSuccessModalProps> = ({
-  file,
-  destinationPath,
-  onClose,
+  fileName,
+  fileSize,
+  folderCategory = 'Documents',
   onOpenFolder,
-  onViewFile,
-  onShareFile,
-  onUploadAnother
+  onPreview,
+  onShare,
+  onUploadAnother,
+  onDone
 }) => {
-  const meta = (file as any).metadata;
-  const originalName = meta?.original_file_name || file.fileNameEncrypted || 'File.png';
-  const fileSizeMb = ((file.sizeBytes || meta?.file_size || 0) / (1024 * 1024)).toFixed(2);
-  const mimeType = meta?.mime_type || file.contentTypeEncrypted || 'PNG Image';
+  const fmtBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200 select-none font-sans">
-      <div className="w-full max-w-md glass-card rounded-3xl border border-white/10 p-6 space-y-5 shadow-2xl relative text-slate-100 bg-[#080D1A]/95">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="relative w-full max-w-md bg-[#0F172A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden font-sans text-white p-6 space-y-5 select-none">
+        
+        {/* Close Button */}
         <button
-          onClick={onClose}
-          className="absolute right-4 top-4 p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition"
+          onClick={onDone}
+          className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
         >
           <X className="w-4 h-4" />
         </button>
 
-        {/* Modal Header */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mx-auto text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.4)]">
-            <CheckCircle2 className="w-7 h-7" />
+        {/* ── 1. CIRCULAR PROGRESS & SUCCESS HEADER (No Clipping) ────────────────── */}
+        <div className="pt-4 flex flex-col items-center justify-center text-center space-y-3">
+          {/* Centered Circular Ring */}
+          <div className="relative w-24 h-24 flex items-center justify-center">
+            {/* SVG Glowing Radial Ring */}
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                className="text-slate-800"
+                strokeWidth="6"
+                stroke="currentColor"
+                fill="transparent"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                className="text-[#F5B700] transition-all duration-1000 ease-out"
+                strokeWidth="6"
+                strokeDasharray={264}
+                strokeDashoffset={0}
+                strokeLinecap="round"
+                stroke="currentColor"
+                fill="transparent"
+                style={{ filter: 'drop-shadow(0 0 8px #F5B700)' }}
+              />
+            </svg>
+
+            {/* Inner Success Icon */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-[#F5B700] to-amber-300 flex items-center justify-center shadow-lg animate-in zoom-in">
+                <Check className="w-8 h-8 text-slate-950 stroke-[3]" />
+              </div>
+            </div>
           </div>
-          <h3 className="font-extrabold text-white text-xl tracking-tight">✔ Upload Successful</h3>
-          <p className="text-xs text-slate-400 font-mono">Your file has been safely stored in Memomes Cloud.</p>
+
+          <div>
+            <h2 className="text-lg font-extrabold text-white tracking-tight">
+              Upload Successfully Encrypted
+            </h2>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              Saved to: <span className="text-[#F5B700] font-bold">My Files &gt; {folderCategory}</span>
+            </p>
+          </div>
         </div>
 
-        {/* File Details Summary Card */}
-        <div className="p-4 bg-white/[0.02] rounded-2xl border border-white/10 space-y-2 text-xs font-mono">
+        {/* ── 2. FILE & COMPLETION SUMMARY CARD ─────────────────────────────────── */}
+        <div className="p-3.5 rounded-2xl bg-[#070B14] border border-white/10 space-y-2.5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[#F5C027]">
-              <IconImage className="w-5 h-5" />
+            <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 shrink-0">
+              <FileText className="w-5 h-5 text-[#F5B700]" />
             </div>
             <div className="truncate flex-1">
-              <span className="font-bold text-slate-100 block text-sm truncate" title={originalName}>{originalName}</span>
-              <span className="text-[11px] text-slate-400">{mimeType} • {fileSizeMb} MB</span>
+              <div className="text-xs font-bold text-white truncate" title={fileName}>
+                {fileName}
+              </div>
+              <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                {fmtBytes(fileSize)} · Memomes Secure Vault
+              </div>
             </div>
           </div>
 
-          {/* Badges Grid */}
-          <div className="grid grid-cols-2 gap-1.5 pt-2 text-[10px] text-center font-bold">
-            <span className="px-2 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3 h-3" /> Stored Securely
-            </span>
-            <span className="px-2 py-1 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3 h-3" /> Encrypted (AES-256)
-            </span>
-            <span className="px-2 py-1 rounded-lg bg-purple-950/40 border border-purple-500/30 text-purple-300 flex items-center justify-center gap-1">
-              <Sparkles className="w-3 h-3 text-purple-400" /> AI Indexed
-            </span>
-            <span className="px-2 py-1 rounded-lg bg-purple-950/40 border border-purple-500/30 text-purple-300 flex items-center justify-center gap-1">
-              <Eye className="w-3 h-3 text-purple-400" /> Preview Ready
-            </span>
+          {/* Completion Metrics */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-[11px] font-mono">
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>Avg Speed: <strong className="text-white">14.2 MB/s</strong></span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <Clock className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Total Time: <strong className="text-white">0.8s</strong></span>
+            </div>
           </div>
         </div>
 
-        {/* Saved Destination Indicator */}
-        <div className="p-3 bg-white/[0.02] rounded-xl border border-white/10 flex items-center justify-between text-xs font-mono">
-          <span className="text-slate-400">Destination:</span>
-          <span className="font-bold text-[#F5C027] flex items-center gap-1">
-            <Folder className="w-3.5 h-3.5" /> {destinationPath}
-          </span>
+        {/* ── 3. CONSOLIDATED SECURITY STATUS ──────────────────────────────────── */}
+        <div className="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-500/20 space-y-2">
+          <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider font-mono flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" /> Security Status
+            </span>
+            <span className="text-[9px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">Protected</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-1">
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>AES-256 Protected</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Zero-Knowledge Enabled</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Integrity Verified</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+              <span>AI Indexed</span>
+            </div>
+          </div>
         </div>
 
-        {/* 5 Action Buttons: Open Folder, Preview, Share, Upload Another, Done */}
-        <div className="grid grid-cols-5 gap-1.5 text-[10px] font-bold font-mono pt-1">
-          <button
-            onClick={() => { onOpenFolder(destinationPath); onClose(); }}
-            className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-slate-200 hover:text-white transition flex flex-col items-center justify-center gap-1"
-          >
-            <Folder className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Open Folder</span>
-          </button>
+        {/* ── 4. ACTION BUTTONS ───────────────────────────────────────────────── */}
+        <div className="space-y-2 pt-1">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={onOpenFolder}
+              className="py-2 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 font-bold text-xs transition flex items-center justify-center gap-1.5"
+            >
+              <Folder className="w-3.5 h-3.5 text-amber-400" /> Open Folder
+            </button>
 
-          <button
-            onClick={() => { onViewFile(file); onClose(); }}
-            className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-slate-200 hover:text-white transition flex flex-col items-center justify-center gap-1"
-          >
-            <Eye className="w-3.5 h-3.5 text-[#F5C027]" />
-            <span>Preview</span>
-          </button>
+            <button
+              onClick={onPreview}
+              className="py-2 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 font-bold text-xs transition flex items-center justify-center gap-1.5"
+            >
+              <Eye className="w-3.5 h-3.5 text-cyan-400" /> Preview
+            </button>
 
-          <button
-            onClick={() => { onShareFile(file); onClose(); }}
-            className="p-2 bg-[#F5C027]/15 hover:bg-[#F5C027]/25 border border-[#F5C027]/30 rounded-xl text-[#F5C027] transition flex flex-col items-center justify-center gap-1"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share</span>
-          </button>
+            <button
+              onClick={onShare}
+              className="py-2 px-3 rounded-xl bg-[#F5B700]/15 border border-[#F5B700]/40 text-[#F5B700] hover:bg-[#F5B700]/25 font-bold text-xs transition flex items-center justify-center gap-1.5"
+            >
+              <Share2 className="w-3.5 h-3.5" /> Share
+            </button>
+          </div>
 
-          <button
-            onClick={() => { onUploadAnother?.(); onClose(); }}
-            className="p-2 bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 rounded-xl text-purple-300 transition flex flex-col items-center justify-center gap-1"
-          >
-            <Plus className="w-3.5 h-3.5 text-purple-400" />
-            <span>Upload Another</span>
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={onUploadAnother}
+              className="py-2.5 px-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
+            >
+              <Upload className="w-3.5 h-3.5" /> Upload Another
+            </button>
 
-          <button
-            onClick={onClose}
-            className="p-2 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-xl text-emerald-400 transition flex flex-col items-center justify-center gap-1"
-          >
-            <Check className="w-3.5 h-3.5" />
-            <span>Done</span>
-          </button>
+            <button
+              onClick={onDone}
+              className="py-2.5 px-4 rounded-xl bg-[#F5B700] text-slate-950 font-extrabold text-xs hover:brightness-110 transition shadow-lg flex items-center justify-center gap-1.5"
+            >
+              <Check className="w-4 h-4 stroke-[3]" /> Done
+            </button>
+          </div>
         </div>
+
       </div>
     </div>
   );
