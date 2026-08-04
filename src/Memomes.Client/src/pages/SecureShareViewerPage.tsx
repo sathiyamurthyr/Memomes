@@ -114,14 +114,15 @@ export const SecureShareViewerPage: React.FC = () => {
           setShareRecord(record);
           const validation = ShareLinkStore.validateAccess(shareCode);
           if (!validation.allowed) {
-            if (validation.errorCode === 'REVOKED') setIsTampered(true);
-            else if (validation.errorCode === 'EXPIRED' || validation.errorCode === 'MAX_VIEWS_EXCEEDED') setIsExpired(true);
-            else if (validation.errorCode === 'BURNED') setIsAlreadyBurned(true);
+            if (validation.errorCode === 'REVOKED') { setIsTampered(true); return; }
+            else if (validation.errorCode === 'EXPIRED' || validation.errorCode === 'MAX_VIEWS_EXCEEDED') { setIsExpired(true); return; }
+            else if (validation.errorCode === 'BURNED') { setIsAlreadyBurned(true); return; }
             else if (validation.errorCode === 'LOCKED_OUT') {
               setIsLockedOut(true);
               setLockoutMsg(validation.errorMessage || 'Security Lockout Active.');
+              return;
             }
-            return;
+            // errorCode === 'PIN_REQUIRED' -> continue to load params & render PIN input form
           }
 
           // Map record to ShareParams structure for UI rendering
