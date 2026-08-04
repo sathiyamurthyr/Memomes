@@ -36,7 +36,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   favoritesCount = 4,
   sharedCount = 12
 }) => {
-  const [isMyFilesExpanded, setIsMyFilesExpanded] = useState(true);
+  const [isMyFilesExpanded, setIsMyFilesExpanded] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('memomes_sidebar_myfiles_expanded');
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleMyFilesExpanded = () => {
+    setIsMyFilesExpanded(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('memomes_sidebar_myfiles_expanded', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const virtualFolders = [
     { id: 'documents', label: 'Documents', icon: FileText, filter: 'Documents' },
@@ -79,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={() => {
                   onSelectTab('files');
-                  setIsMyFilesExpanded(!isMyFilesExpanded);
+                  toggleMyFilesExpanded();
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all ${
                   activeTab === 'files'
