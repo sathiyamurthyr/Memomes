@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { 
+  LayoutDashboard,
   Folder, 
   FileText, 
   Image as IconImage, 
@@ -60,6 +61,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </h4>
 
           <nav className="space-y-1">
+            {/* Dashboard Main Menu */}
+            <button
+              onClick={() => onSelectTab('dashboard')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold transition-all ${
+                activeTab === 'dashboard'
+                  ? 'bg-[#F5B700]/15 text-white border border-[#F5B700]/30 shadow-sm'
+                  : 'text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 text-[#F5B700]" />
+              <span>Dashboard</span>
+            </button>
+
             {/* My Files Main Folder Header */}
             <div>
               <button
