@@ -159,7 +159,11 @@ export const SecureShareViewerPage: React.FC = () => {
           // If no PIN required, auto unlock & record analytics event
           if (!record.pinProtected) {
             setIsUnlocked(true);
+            setIsLoadingScreenActive(true);
             ShareLinkStore.recordViewEvent(shareCode);
+          } else {
+            setIsUnlocked(false);
+            setIsLoadingScreenActive(false);
           }
           return;
         }
@@ -180,6 +184,14 @@ export const SecureShareViewerPage: React.FC = () => {
       const t = dp.expiry === '60s' ? 60 : dp.expiry === '1h' ? 3600 : 86400;
       setTimeLeft(t);
       setInitialTime(t);
+
+      if (!dp.pin) {
+        setIsUnlocked(true);
+        setIsLoadingScreenActive(true);
+      } else {
+        setIsUnlocked(false);
+        setIsLoadingScreenActive(false);
+      }
 
       const vaultFile = LocalVaultDb.getFile(shareCode) || LocalVaultDb.getAllFiles()[0] || null;
       if (vaultFile) setTargetFile(vaultFile);
@@ -231,6 +243,7 @@ export const SecureShareViewerPage: React.FC = () => {
     }
 
     setIsUnlocked(true);
+    setIsLoadingScreenActive(true);
     setPwError(false);
     setPinAttemptsInfo('');
     if (decryptedParams?.oneTime) localStorage.setItem(`burned_${shareCode}`, '1');
@@ -908,10 +921,19 @@ export const SecureShareViewerPage: React.FC = () => {
 
   /* ─── Initial Link Resolving Loading state ─── */
   return (
-    <SecureShareLoadingScreen
-      fileName="Resolving Secure Link..."
-      onRetry={() => window.location.reload()}
-      onCancel={() => window.history.back()}
-    />
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#09090B' }}>
+      <MeshBg />
+      <div style={{ zIndex: 1, position: 'relative', textAlign: 'center' }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: '50%', margin: '0 auto 16px',
+          border: '2px solid #374151', borderTopColor: '#FACC15',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ fontSize: 13, color: '#9CA3AF', fontFamily: '"JetBrains Mono", monospace' }}>
+          Verifying cryptographic link...
+        </div>
+      </div>
+    </div>
   );
 };
