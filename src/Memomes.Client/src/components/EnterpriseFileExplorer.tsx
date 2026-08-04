@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Folder, FolderPlus, FileText, Image, Film, Music, Archive, Code,
   Table, Presentation, File, ChevronRight, ChevronDown, Grid, List,
-  Trash2, Share2, ShieldCheck, Info, BarChart2, Search, ArrowUpDown
+  Trash2, Share2, ShieldCheck, BarChart2, Search, ArrowUpDown
 } from 'lucide-react';
 import { LocalVaultDb, type VaultFile } from '../utils/localVaultDb';
 import { StoragePathBuilder, type EnterpriseFileType } from '../utils/storagePathBuilder';
 import { b2SyncWorker } from '../utils/b2SyncWorker';
 import { navStateStore, type FileExplorerState } from '../utils/fileExplorerNavStateStore';
 import { Breadcrumbs } from './Breadcrumbs';
+import { FileInformationPanel } from './FileInformationPanel';
 
 interface EnterpriseFileExplorerProps {
   userEmail?: string;
@@ -473,100 +474,15 @@ export const EnterpriseFileExplorer: React.FC<EnterpriseFileExplorerProps> = ({
 
         </div>
 
-        {/* FILE DETAILS INSPECTOR (4 COLS) */}
+        {/* FILE INFORMATION PANEL (4 COLS) */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="glass-card p-5 rounded-3xl border border-white/10 space-y-4">
-            <h3 className="text-xs font-bold text-[#F5B700] uppercase tracking-wider font-mono flex items-center gap-2">
-              <Info className="w-4 h-4" /> File Details & Security Inspector
-            </h3>
-
-            {selectedFileItem ? (
-              <div className="space-y-4 text-xs font-sans">
-                {/* File Preview Thumbnail */}
-                <div className="h-36 rounded-2xl bg-[#070B14] border border-white/10 overflow-hidden flex items-center justify-center relative group">
-                  {selectedFileItem.type.startsWith('image/') && (selectedFileItem.dataUrl || selectedFileItem.b2FinalUrl) ? (
-                    <img
-                      src={selectedFileItem.dataUrl || selectedFileItem.b2FinalUrl}
-                      alt={selectedFileItem.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center space-y-2">
-                      {getCategoryIcon(activeCategoryName)}
-                      <div className="text-[11px] text-slate-400 font-mono">{selectedFileItem.name.split('.').pop()?.toUpperCase()} File</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Name & Basic Info */}
-                <div>
-                  <div className="text-sm font-bold text-white truncate" title={selectedFileItem.name}>
-                    {selectedFileItem.name}
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                    {fmtBytes(getFileSizeBytes(selectedFileItem))} · {selectedFileItem.type}
-                  </div>
-                </div>
-
-                {/* Security Properties */}
-                <div className="p-3 rounded-2xl bg-[#070B14] border border-white/10 space-y-2 text-[11px] font-mono">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Encryption:</span>
-                    <span className="text-emerald-400 font-bold">AES-256-GCM</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Zero-Knowledge:</span>
-                    <span className="text-emerald-400 font-[#F5B700]">Enforced</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Storage Provider:</span>
-                    <span className="text-slate-300">Backblaze B2 Vault</span>
-                  </div>
-                </div>
-
-                {/* Admin-Only Infrastructure View */}
-                {navState.isAdminInfraMode && (
-                  <div className="p-3 rounded-2xl bg-amber-950/40 border border-amber-500/30 space-y-2 text-[10px] font-mono">
-                    <div className="text-amber-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" /> Admin Object Key Metadata
-                    </div>
-                    <div className="break-all text-slate-300">
-                      <span className="text-slate-500 block">Object Key Path:</span>
-                      {selectedFileItem.metadata?.object_key || selectedFileItem.b2Path || `sathus/memomes/wrk_VAULT/usr_SELF/${activeCategoryName}`}
-                    </div>
-                    {selectedFileItem.metadata?.file_id && (
-                      <div className="break-all text-slate-300">
-                        <span className="text-slate-500 block">B2 File ID:</span>
-                        {selectedFileItem.metadata.file_id}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => onOpenShare(selectedFileItem)}
-                    className="flex-1 py-2 rounded-xl bg-[#F5B700] text-slate-950 font-bold text-xs hover:brightness-110 transition flex items-center justify-center gap-1.5"
-                  >
-                    <Share2 className="w-3.5 h-3.5" /> Share
-                  </button>
-                  <button
-                    onClick={() => handleDeleteFile(selectedFileItem.id)}
-                    className="px-3 py-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition text-xs font-bold"
-                  >
-                    Delete
-                  </button>
-                </div>
-
-              </div>
-            ) : (
-              <div className="text-center py-12 text-slate-500 space-y-2">
-                <Info className="w-8 h-8 text-slate-600 mx-auto" />
-                <div className="text-xs font-mono">Select a file to inspect metadata and security attributes.</div>
-              </div>
-            )}
-          </div>
+          <FileInformationPanel
+            file={selectedFileItem}
+            activeCategory={activeCategoryName}
+            onOpenShare={onOpenShare}
+            onDelete={handleDeleteFile}
+            onOpenUpload={onOpenUpload}
+          />
         </div>
 
       </div>
