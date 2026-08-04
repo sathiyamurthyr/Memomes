@@ -277,7 +277,18 @@ export class B2SyncWorker {
     const b2FinalUrl = pathInfo.b2FinalUrl;
 
     try {
-      // Strategy 1: Direct B2 Native API upload
+      // Strategy 1: Server-Side B2 Proxy Route (No CORS restrictions)
+      const uploadedProxy = await this.uploadViaB2ServerProxy(file, b2Path);
+      if (uploadedProxy) {
+        this.persistSyncedRecord(file, b2Path, b2FinalUrl);
+        return true;
+      }
+    } catch (e: any) {
+      console.warn(`[B2Sync] B2 Server Proxy upload failed for ${file.name}:`, e?.message);
+    }
+
+    try {
+      // Strategy 2: Direct B2 Native API upload
       if (this.b2Auth && this.b2BucketId) {
         const uploaded = await this.uploadViaB2NativeApi(file, b2Path);
         if (uploaded) {
@@ -287,13 +298,12 @@ export class B2SyncWorker {
       }
     } catch (e: any) {
       console.warn(`[B2Sync] Native B2 upload failed for ${file.name}:`, e?.message);
-      // Auth may be stale — reset it
       this.b2Auth = null;
       this.b2BucketId = null;
     }
 
     try {
-      // Strategy 2: Fallback — presigned URL via .NET API
+      // Strategy 3: Fallback — presigned URL via .NET API
       const uploaded = await this.uploadViaPresignedUrl(file, b2Path);
       if (uploaded) {
         this.persistSyncedRecord(file, b2Path, b2FinalUrl);
@@ -304,6 +314,31 @@ export class B2SyncWorker {
     }
 
     console.warn(`[B2Sync] ⚠ Could not upload ${file.name} — will retry next cycle`);
+    return false;
+  }
+
+  private async uploadViaB2ServerProxy(file: VaultFile, b2Path: string): Promise<boolean> {
+    try {
+      const blob = this.dataUrlToBlob(file.dataUrl);
+      const res = await fetch('/api/b2-direct-upload', {
+        method: 'POST',
+        headers: {
+          'X-Bz-File-Name': encodeURIComponent(b2Path),
+          'Content-Type': file.type || 'application/octet-stream'
+        },
+        body: blob
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          console.info(`✅ B2 Server Proxy uploaded: ${file.name} (ID: ${data.fileId})`);
+          return true;
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[B2Sync] B2 proxy fetch error:`, err?.message);
+    }
     return false;
   }
 
