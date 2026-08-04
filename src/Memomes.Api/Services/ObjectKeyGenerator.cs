@@ -96,7 +96,7 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
         var day = now.ToString("dd");
 
         // Secure ULID / UUID hex object name (never original filename)
-        var encryptedObjectId = $"{Guid.NewGuid():N}";
+        var encryptedObjectId = $"obj_{Guid.NewGuid():N}";
         var storageObjectName = $"{encryptedObjectId}.enc";
 
         string objectKey;

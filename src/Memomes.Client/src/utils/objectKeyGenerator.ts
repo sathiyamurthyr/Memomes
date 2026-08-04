@@ -84,10 +84,8 @@ export class ObjectKeyGenerator {
   }
 
   static generateEncryptedObjectId(): string {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-      return crypto.randomUUID().replace(/-/g, '');
-    }
-    return UlidEngine.generate('obj').replace(/^obj_/, '');
+    const rawUlid = UlidEngine.generate('obj');
+    return rawUlid.startsWith('obj_') ? rawUlid : `obj_${rawUlid}`;
   }
 
   static detectWorkspaceType(params: ObjectKeyParams): WorkspaceType {
