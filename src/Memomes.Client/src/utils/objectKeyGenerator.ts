@@ -98,10 +98,21 @@ export class ObjectKeyGenerator {
     return 'PERSONAL';
   }
 
+  static sanitizeStorageId(prefix: 'wrk' | 'usr' | 'fld' | 'obj' | 'thm' | 'prv' | 'shr', existingId?: string): string {
+    if (existingId && 
+        existingId.startsWith(`${prefix}_`) && 
+        !existingId.includes('001') && 
+        !existingId.includes('user001') && 
+        !existingId.includes('workspace001')) {
+      return existingId.trim();
+    }
+    return UlidEngine.generate(prefix);
+  }
+
   static generateObjectKey(params: ObjectKeyParams): ObjectKeyResult {
     const type = this.detectWorkspaceType(params);
-    const workspaceId = (params.workspaceId || 'workspace001').toLowerCase().trim();
-    const userId = (params.userId || 'user001').toLowerCase().trim();
+    const workspaceId = this.sanitizeStorageId('wrk', params.workspaceId);
+    const userId = this.sanitizeStorageId('usr', params.userId);
     const tenantId = (params.tenantId || 'tenant001').toLowerCase().trim();
     const companyId = (params.companyId || 'company001').toLowerCase().trim();
     const fileType = this.classifyFileType(params.mimeType, params.originalFileName);
@@ -111,7 +122,7 @@ export class ObjectKeyGenerator {
     const month = String(now.getUTCMonth() + 1).padStart(2, '0');
     const day = String(now.getUTCDate()).padStart(2, '0');
 
-    const encryptedObjectId = this.generateEncryptedObjectId();
+    const encryptedObjectId = this.sanitizeStorageId('obj');
     const storageObjectName = `${encryptedObjectId}.enc`;
 
     let objectKey = '';

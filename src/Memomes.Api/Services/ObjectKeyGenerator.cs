@@ -46,6 +46,12 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
 {
     private const string DefaultBucket = "sathus-memomes-vault";
     private const string BasePrefix = "sathus/memomes";
+    private readonly IStorageIdentityService _identityService;
+
+    public ObjectKeyGeneratorService(IStorageIdentityService identityService)
+    {
+        _identityService = identityService;
+    }
 
     public WorkspaceType DetectWorkspaceType(ObjectKeyRequest request)
     {
@@ -86,8 +92,8 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
     public ObjectKeyGenerationResult GenerateObjectKey(ObjectKeyRequest request)
     {
         var type = DetectWorkspaceType(request);
-        var workspaceId = string.IsNullOrWhiteSpace(request.WorkspaceId) ? "workspace001" : request.WorkspaceId.ToLower().Trim();
-        var userId = request.UserId?.ToString() ?? "user001";
+        var workspaceId = _identityService.SanitizeStorageId("wrk", request.WorkspaceId);
+        var userId = _identityService.SanitizeStorageId("usr", request.UserId?.ToString());
         var fileType = ClassifyFileType(request.ContentType, request.OriginalFileName);
 
         var now = request.Date ?? DateTime.UtcNow;
@@ -95,20 +101,20 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
         var month = now.ToString("MM");
         var day = now.ToString("dd");
 
-        // Secure ULID / UUID hex object name (never original filename)
-        var encryptedObjectId = $"obj_{Guid.NewGuid():N}";
+        // Permanent immutable Storage Object ID (obj_<ULID>)
+        var encryptedObjectId = _identityService.GenerateObjectId();
         var storageObjectName = $"{encryptedObjectId}.enc";
 
         string objectKey;
 
         if (type == WorkspaceType.Personal)
         {
-            // Personal Format: sathus/memomes/{workspaceId}/{userId}/{fileType}/{YYYY}/{MM}/{DD}/{encryptedObjectId}.enc
+            // Personal Format: sathus/memomes/{workspaceStorageId}/{userStorageId}/{fileType}/{YYYY}/{MM}/{DD}/{objectStorageId}.enc
             objectKey = $"{BasePrefix}/{workspaceId}/{userId}/{fileType}/{year}/{month}/{day}/{storageObjectName}";
         }
         else
         {
-            // Business/Enterprise Format: sathus/memomes/{workspaceId}/{tenantId}/{companyId}/{userId}/{fileType}/{YYYY}/{MM}/{DD}/{encryptedObjectId}.enc
+            // Business/Enterprise Format: sathus/memomes/{workspaceStorageId}/{tenantId}/{companyId}/{userStorageId}/{fileType}/{YYYY}/{MM}/{DD}/{objectStorageId}.enc
             var tenantId = string.IsNullOrWhiteSpace(request.TenantId) ? "tenant001" : request.TenantId.ToLower().Trim();
             var companyId = string.IsNullOrWhiteSpace(request.CompanyId) ? "company001" : request.CompanyId.ToLower().Trim();
             objectKey = $"{BasePrefix}/{workspaceId}/{tenantId}/{companyId}/{userId}/{fileType}/{year}/{month}/{day}/{storageObjectName}";

@@ -18,6 +18,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 });
 
 // Storage Service, Audit Logger, Preview Generator & Object Key Generator
+builder.Services.AddSingleton<IStorageIdentityService, StorageIdentityService>();
 builder.Services.AddSingleton<IS3StorageService, S3StorageService>();
 builder.Services.AddScoped<IAuditLoggerService, AuditLoggerService>();
 builder.Services.AddSingleton<IPreviewGeneratorService, PreviewGeneratorService>();
