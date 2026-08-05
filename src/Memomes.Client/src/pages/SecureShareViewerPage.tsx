@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck, Lock, Download, AlertTriangle, RefreshCw, X,
-  ShieldAlert, Clock, Flame, Eye, ZapOff, Scan
+  ShieldAlert, Clock, Flame, Eye, ZapOff, Scan, Music, FileText, Table
 } from 'lucide-react';
 import { ShareCrypto, type ShareParams } from '../utils/shareCrypto';
 import { LocalVaultDb, type VaultFile } from '../utils/localVaultDb';
@@ -122,7 +122,6 @@ export const SecureShareViewerPage: React.FC = () => {
               setLockoutMsg(validation.errorMessage || 'Security Lockout Active.');
               return;
             }
-            // errorCode === 'PIN_REQUIRED' -> continue to load params & render PIN input form
           }
 
           // Map record to ShareParams structure for UI rendering
@@ -151,7 +150,6 @@ export const SecureShareViewerPage: React.FC = () => {
           if (vaultFile) {
             setTargetFile(vaultFile);
           } else {
-            // Fallback: search all vault files for matching name
             const allFiles = LocalVaultDb.getAllFiles();
             const match = allFiles.find(f => f.name === record.fileName) || allFiles[0] || null;
             if (match) setTargetFile(match);
@@ -168,34 +166,71 @@ export const SecureShareViewerPage: React.FC = () => {
           }
           return;
         }
-        // Share code present but not found in store — show Not Found (not Tampered)
-        // This can happen when the store was cleared or link doesn't exist here
-        setIsNotFound(true);
-        return;
       }
 
-      // Priority 2: Fallback to Encrypted Token parameter 'p'
-      if (!p) { setIsNotFound(true); return; }
-      const dp = await ShareCrypto.decryptParams(shareCode || 'demo-share-id', p);
-      if (!dp) { setIsTampered(true); return; }
-      setDecryptedParams(dp);
-      if (dp.oneTime && localStorage.getItem(`burned_${shareCode}`) === '1') {
-        setIsAlreadyBurned(true);
-      }
-      const t = dp.expiry === '60s' ? 60 : dp.expiry === '1h' ? 3600 : 86400;
-      setTimeLeft(t);
-      setInitialTime(t);
+      // Priority 2: Fallback to Encrypted Token parameter 'p' (cross-origin / recipient device)
+      if (p) {
+        const dp = await ShareCrypto.decryptParams(shareCode || 'demo-share-id', p);
+        if (dp) {
+          setDecryptedParams(dp);
+          if (dp.previewUrl) setDirectPreviewUrl(dp.previewUrl);
+          if (dp.oneTime && localStorage.getItem(`burned_${shareCode}`) === '1') {
+            setIsAlreadyBurned(true);
+          }
+          const t = dp.expiry === '60s' ? 60 : dp.expiry === '1h' ? 3600 : 86400;
+          setTimeLeft(t);
+          setInitialTime(t);
 
-      if (!dp.pin) {
-        setIsUnlocked(true);
-        setIsLoadingScreenActive(true);
-      } else {
-        setIsUnlocked(false);
-        setIsLoadingScreenActive(false);
+          if (!dp.pin) {
+            setIsUnlocked(true);
+            setIsLoadingScreenActive(true);
+          } else {
+            setIsUnlocked(false);
+            setIsLoadingScreenActive(false);
+          }
+
+          const vaultFile = LocalVaultDb.getFile(shareCode) || LocalVaultDb.getAllFiles().find(f => f.name === dp.fileName || f.id === shareCode) || null;
+          if (vaultFile) {
+            setTargetFile(vaultFile);
+          } else if (dp.fileName) {
+            // Synthesize VaultFile for recipient device viewing
+            setTargetFile({
+              id: shareCode || 'shared-file',
+              name: dp.fileName,
+              size: typeof dp.fileSize === 'string' ? dp.fileSize : `${(dp.fileSize || 1024)} B`,
+              type: dp.mimeType || 'application/octet-stream',
+              dataUrl: dp.previewUrl || '',
+              previewUrl: dp.previewUrl || '',
+              uploadedAt: new Date().toISOString(),
+              accessTier: (dp.tier as any) || 'VIEW_ONLY',
+              shared: true,
+              category: 'Documents'
+            });
+          }
+          return;
+        }
       }
 
-      const vaultFile = LocalVaultDb.getFile(shareCode) || LocalVaultDb.getAllFiles()[0] || null;
-      if (vaultFile) setTargetFile(vaultFile);
+      // Priority 3: Check LocalVaultDb directly by fileId or code (same-origin session fallback)
+      if (shareCode) {
+        const vaultFile = LocalVaultDb.getFile(shareCode) || LocalVaultDb.getAllFiles().find(f => f.id === shareCode || f.name === shareCode);
+        if (vaultFile) {
+          setTargetFile(vaultFile);
+          setDecryptedParams({
+            tier: vaultFile.accessTier || 'VIEW_ONLY',
+            expiry: '24h',
+            zk: true,
+            oneTime: false,
+            watermark: { text: 'CONFIDENTIAL', font: 'mono', density: 'medium', rotation: -15 }
+          });
+          setIsUnlocked(true);
+          setIsLoadingScreenActive(true);
+          return;
+        }
+      }
+
+      // If all resolution pathways fail, show Not Found
+      setIsNotFound(true);
     };
     init();
   }, [shareCode, p]);
@@ -315,13 +350,20 @@ export const SecureShareViewerPage: React.FC = () => {
 
   /* Watermark renderer */
   const renderWatermark = () => {
-    const wm = decryptedParams?.watermark || {
-      text: 'RECIPIENT · 103.21.124.5',
-      font: 'mono',
-      density: 'medium',
-      rotation: -15
-    };
-    const { text, font, density, rotation } = wm;
+    // Strictly respect disabled watermark (if watermark is null/false in params or enableWatermark is false in shareRecord)
+    const isWatermarkDisabledInParams = decryptedParams && ('watermark' in decryptedParams) && (decryptedParams.watermark === null || (decryptedParams.watermark as any) === false);
+    const isWatermarkDisabledInRecord = shareRecord && shareRecord.enableWatermark === false;
+
+    if (isWatermarkDisabledInParams || isWatermarkDisabledInRecord) {
+      return null;
+    }
+
+    const wm = decryptedParams?.watermark || (shareRecord?.enableWatermark && shareRecord.watermarkConfig ? shareRecord.watermarkConfig : null);
+    if (!wm) return null;
+
+    const { text, font = 'mono', density = 'medium', rotation = -15 } = wm;
+    if (!text) return null;
+
     const count = density === 'low' ? 6 : density === 'high' ? 20 : 12;
     const cols = density === 'low' ? 2 : density === 'high' ? 4 : 3;
     const fontMap: Record<string, string> = { mono: '"JetBrains Mono", monospace', sans: 'Inter, sans-serif', serif: 'Georgia, serif' };
@@ -349,15 +391,73 @@ export const SecureShareViewerPage: React.FC = () => {
     );
   };
 
-  // File display: prefer VaultFile, then direct preview URL from share record, then placeholder
+  // File display: prefer VaultFile, then direct preview URL from share record, then empty string (no fake placeholder)
   const displayUrl = targetFile
-    ? (targetFile.dataUrl || targetFile.b2FinalUrl || directPreviewUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80')
-    : (directPreviewUrl || (shareRecord?.previewUrl) || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80');
+    ? (targetFile.dataUrl || targetFile.b2FinalUrl || directPreviewUrl || '')
+    : (directPreviewUrl || (shareRecord?.previewUrl) || '');
   const displayName = targetFile ? targetFile.name : (shareRecord?.fileName || 'Confidential_Document.png');
   const displayMime = targetFile ? targetFile.type : (shareRecord?.mimeType || 'image/png');
   const isViewOnly = decryptedParams?.tier === 'VIEW_ONLY';
   const tierLabel = decryptedParams?.tier === 'VIEW_ONLY' ? 'View Only' : decryptedParams?.tier === 'READ_DOWNLOAD' ? 'Download' : 'Full Control';
   const tierColor = decryptedParams?.tier === 'VIEW_ONLY' ? '#FFD447' : decryptedParams?.tier === 'READ_DOWNLOAD' ? '#3B8BEB' : '#10B981';
+
+  // Decode text & CSV content for recipient viewing
+  const [textContent, setTextContent] = useState<string>('');
+  const [csvRows, setCsvRows] = useState<string[][]>([]);
+
+  useEffect(() => {
+    if (!displayUrl) {
+      setTextContent('');
+      setCsvRows([]);
+      return;
+    }
+
+    const nameLower = displayName.toLowerCase();
+    const isCsvFile = nameLower.endsWith('.csv') || nameLower.endsWith('.tsv') || displayMime.includes('csv');
+    const isTextFile = nameLower.match(/\.(txt|md|json|js|ts|tsx|jsx|cs|py|html|css|sql|xml|log|doc|docx)$/i) || displayMime.startsWith('text/') || displayMime.includes('json');
+
+    if (isCsvFile || isTextFile) {
+      if (displayUrl.startsWith('data:')) {
+        try {
+          const parts = displayUrl.split(',');
+          const base64 = parts[1];
+          if (base64 && !base64.includes('RAM_CACHED')) {
+            const decoded = atob(base64);
+            setTextContent(decoded);
+            if (isCsvFile) {
+              const lines = decoded.split(/\r?\n/).filter(l => l.trim().length > 0);
+              const rows = lines.map(line => line.split(',').map(cell => cell.trim().replace(/^["']|["']$/g, '')));
+              setCsvRows(rows);
+            }
+          }
+        } catch {
+          fetch(displayUrl)
+            .then(res => res.text())
+            .then(text => {
+              setTextContent(text);
+              if (isCsvFile) {
+                const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+                const rows = lines.map(line => line.split(',').map(cell => cell.trim().replace(/^["']|["']$/g, '')));
+                setCsvRows(rows);
+              }
+            })
+            .catch(() => {});
+        }
+      } else if (displayUrl.startsWith('http') || displayUrl.startsWith('blob:')) {
+        fetch(displayUrl)
+          .then(res => res.text())
+          .then(text => {
+            setTextContent(text);
+            if (isCsvFile) {
+              const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+              const rows = lines.map(line => line.split(',').map(cell => cell.trim().replace(/^["']|["']$/g, '')));
+              setCsvRows(rows);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [displayUrl, displayName, displayMime]);
 
   /* ─── State: Not Found ─── */
   if (isNotFound) return (
@@ -837,6 +937,91 @@ export const SecureShareViewerPage: React.FC = () => {
                     border: '1px solid rgba(255,255,255,0.1)',
                     background: '#FFFFFF'
                   }}
+                />
+              ) : displayName.match(/\.(csv|tsv)$/i) || displayMime.includes('csv') ? (
+                /* CSV & SPREADSHEET INTERACTIVE DATA TABLE */
+                <div className="w-full max-w-4xl max-h-[60vh] bg-[#0A0F1D] border border-white/10 rounded-2xl p-4 overflow-auto shadow-2xl font-mono text-left select-text relative z-20">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+                    <span className="text-[#F5B700] text-xs font-bold flex items-center gap-1.5">
+                      <Table className="w-4 h-4 text-emerald-400" /> {displayName} ({csvRows.length > 0 ? `${csvRows.length} Rows` : 'Decrypted in RAM'})
+                    </span>
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full font-bold border border-emerald-500/20">
+                      Zero-Knowledge Grid
+                    </span>
+                  </div>
+
+                  {csvRows.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-[11px] text-slate-200">
+                        <thead>
+                          <tr className="bg-[#050816] text-[#F5B700] border-b border-white/10">
+                            {csvRows[0].map((header, idx) => (
+                              <th key={idx} className="p-2 border-r border-white/10 font-bold truncate max-w-[180px]">
+                                {header || `Col ${idx + 1}`}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvRows.slice(1).map((row, rIdx) => (
+                            <tr key={rIdx} className="border-b border-white/5 hover:bg-white/5 transition">
+                              {row.map((cell, cIdx) => (
+                                <td key={cIdx} className="p-2 border-r border-white/5 truncate max-w-[180px] font-mono">
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : textContent ? (
+                    <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap leading-relaxed p-2">
+                      {textContent}
+                    </pre>
+                  ) : (
+                    <div className="p-6 text-center text-slate-400 font-mono text-xs">
+                      Decrypted CSV payload loaded into memory stream.
+                    </div>
+                  )}
+                </div>
+              ) : displayName.match(/\.(txt|md|json|js|ts|tsx|jsx|cs|py|html|css|sql|xml|log|doc|docx)$/i) || displayMime.startsWith('text/') || displayMime.includes('json') ? (
+                /* TEXT, CODE & DOCUMENT VIEWER */
+                <div className="w-full max-w-3xl max-h-[60vh] bg-[#070B14] border border-white/10 rounded-2xl p-5 overflow-auto shadow-2xl font-mono text-left select-text space-y-3 relative z-20">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="text-[#F5B700] text-xs font-bold flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-cyan-400" /> {displayName}
+                    </span>
+                    <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full font-bold border border-cyan-500/20">
+                      Decrypted Text Stream
+                    </span>
+                  </div>
+                  <pre className="text-xs text-slate-200 font-mono whitespace-pre-wrap leading-relaxed bg-[#03060E] p-4 rounded-xl border border-white/5 overflow-x-auto max-h-[48vh]">
+                    {textContent || 'Decrypted zero-knowledge text buffer in RAM.'}
+                  </pre>
+                </div>
+              ) : displayMime.startsWith('audio/') || displayName.match(/\.(mp3|wav|aac|flac|ogg|m4a)$/i) ? (
+                <div className="w-full max-w-md p-6 bg-[#0E1524] rounded-2xl border border-white/10 text-center space-y-4 shadow-2xl">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
+                    <Music className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white truncate">{displayName}</h4>
+                    <p className="text-[11px] text-slate-400 font-mono mt-1">Zero-Knowledge Decrypted Audio Stream</p>
+                  </div>
+                  <audio
+                    src={displayUrl || undefined}
+                    controls
+                    controlsList="nodownload"
+                    className="w-full mt-2"
+                  />
+                </div>
+              ) : displayMime.startsWith('video/') || displayName.match(/\.(mp4|mov|webm|mkv|avi)$/i) ? (
+                <video
+                  src={displayUrl}
+                  controls
+                  controlsList="nodownload"
+                  className="max-w-full max-h-[60vh] rounded-xl shadow-2xl"
                 />
               ) : (
                 <img

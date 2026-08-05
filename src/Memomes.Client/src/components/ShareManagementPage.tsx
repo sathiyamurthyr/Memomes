@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Share2, Lock, Flame, Eye, Check, Shield, Download,
   Copy, Sliders, RefreshCw, AlertTriangle, QrCode, Globe, Clock,
@@ -9,6 +9,9 @@ import type { FileItem } from './DashboardV2';
 import { ShareCodeService, type BrandedDomainType } from '../utils/shareCodeService';
 import { ShareLinkStore, type ShareLinkRecord } from '../utils/shareLinkStore';
 import { type PostLimitAction } from '../utils/shareSecurityPolicyService';
+import { getAppBaseUrl } from '../utils/urlHelper';
+import { ShareCrypto } from '../utils/shareCrypto';
+import { LiveRecipientStreamPreview } from './LiveRecipientStreamPreview';
 
 interface ShareManagementPageProps {
   file: FileItem;
@@ -73,12 +76,6 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
     showToast('✔ Link security lockout cleared & failed counter reset!');
   };
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const isVideo = file.category === 'video' || file.type?.startsWith('video/') || /\.(mp4|mov|mkv|avi|webm|m4v)$/i.test(file.name);
-  const isImage = file.category === 'image' || file.type?.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(file.name);
-  const isPdf = file.name.endsWith('.pdf') || file.type?.includes('pdf');
-
   // Load existing share links for this file
   useEffect(() => {
     refreshFileLinks();
@@ -103,78 +100,105 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
 
   // Generate Base62 Branded Short Link & Sync with ShareLinkStore
   useEffect(() => {
-    const activeCode = (useCustomAlias && customAlias.trim() && !aliasError)
-      ? customAlias.trim()
-      : shareCode;
+    let isMounted = true;
+    const generateLink = async () => {
+      const activeCode = (useCustomAlias && customAlias.trim() && !aliasError)
+        ? customAlias.trim()
+        : shareCode;
 
-    // Calculate expiry timestamp
-    let expiresAtIso: string | null = null;
-    if (expiryOption === '60s') {
-      expiresAtIso = new Date(Date.now() + 60_000).toISOString();
-    } else if (expiryOption === '1h') {
-      expiresAtIso = new Date(Date.now() + 3600_000).toISOString();
-    } else if (expiryOption === '24h') {
-      expiresAtIso = new Date(Date.now() + 86400_000).toISOString();
-    } else if (expiryOption === '7d') {
-      expiresAtIso = new Date(Date.now() + 7 * 86400_000).toISOString();
-    } else if (expiryOption === 'custom' && customExpiryDate) {
-      expiresAtIso = new Date(customExpiryDate).toISOString();
-    }
+      // Calculate expiry timestamp
+      let expiresAtIso: string | null = null;
+      if (expiryOption === '60s') {
+        expiresAtIso = new Date(Date.now() + 60_000).toISOString();
+      } else if (expiryOption === '1h') {
+        expiresAtIso = new Date(Date.now() + 3600_000).toISOString();
+      } else if (expiryOption === '24h') {
+        expiresAtIso = new Date(Date.now() + 86400_000).toISOString();
+      } else if (expiryOption === '7d') {
+        expiresAtIso = new Date(Date.now() + 7 * 86400_000).toISOString();
+      } else if (expiryOption === 'custom' && customExpiryDate) {
+        expiresAtIso = new Date(customExpiryDate).toISOString();
+      }
 
-    const maxViewsNum = maxViewsInput.trim() ? parseInt(maxViewsInput, 10) : null;
-    const brandedUrl = ShareCodeService.formatBrandedUrl(domainType, activeCode);
+      const maxViewsNum = maxViewsInput.trim() ? parseInt(maxViewsInput, 10) : null;
+      const baseBrandedUrl = ShareCodeService.formatBrandedUrl(domainType, activeCode, getAppBaseUrl());
 
-    setGeneratedLink(brandedUrl);
+      const previewPayload = file.previewUrl || file.dataUrl || file.b2FinalUrl || undefined;
 
-    // Save/Update in ShareLinkStore
-    const record: ShareLinkRecord = {
-      id: `sl-${file.id}-${activeCode}`,
-      shareCode: activeCode,
-      customAlias: useCustomAlias ? customAlias.trim() : undefined,
-      fileId: file.id,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type || 'application/octet-stream',
-      // Store previewUrl so share viewer can render file content without LocalVaultDb
-      previewUrl: file.previewUrl || undefined,
-      tenantId: 'tenant001',
-      companyId: 'company001',
-      workspaceId: 'workspace001',
-      createdBy: userEmail,
-      accessTier,
-      passwordPin: passwordPin || undefined,
-      pinProtected: Boolean(passwordPin),
-      failedAttempts: 0,
-      maxFailedAttempts,
-      postLimitAction,
-      lockedUntil: null,
-      isLockedOut: false,
-      securityEvents: [],
-      expiresAt: expiresAtIso,
-      maxViews: maxViewsNum && !isNaN(maxViewsNum) ? maxViewsNum : null,
-      currentViews: 0,
-      isExpired: false,
-      isRevoked: false,
-      burnOnRead: enableSelfDestruct,
-      enableWatermark,
-      watermarkConfig: enableWatermark ? {
-        text: watermarkText,
-        font: watermarkFont,
-        density: watermarkDensity,
-        rotation: watermarkRotation,
-        opacity: watermarkOpacity
-      } : undefined,
-      domainType,
-      brandedUrl,
-      analytics: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      const token = await ShareCrypto.encryptParams(activeCode, {
+        tier: accessTier,
+        expiry: expiryOption,
+        zk: true,
+        oneTime: enableSelfDestruct,
+        pin: passwordPin || null,
+        watermark: enableWatermark ? {
+          text: watermarkText,
+          font: watermarkFont,
+          density: watermarkDensity,
+          rotation: watermarkRotation,
+          opacity: watermarkOpacity
+        } : null,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || 'application/octet-stream',
+        previewUrl: previewPayload && !previewPayload.includes('RAM_CACHED') ? previewPayload : undefined
+      });
+
+      const fullBrandedUrl = `${baseBrandedUrl}?p=${token}`;
+      if (isMounted) setGeneratedLink(fullBrandedUrl);
+
+      // Save/Update in ShareLinkStore
+      const record: ShareLinkRecord = {
+        id: `sl-${file.id}-${activeCode}`,
+        shareCode: activeCode,
+        customAlias: useCustomAlias ? customAlias.trim() : undefined,
+        fileId: file.id,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type || 'application/octet-stream',
+        previewUrl: previewPayload,
+        tenantId: 'tenant001',
+        companyId: 'company001',
+        workspaceId: 'workspace001',
+        createdBy: userEmail,
+        accessTier,
+        passwordPin: passwordPin || undefined,
+        pinProtected: Boolean(passwordPin),
+        failedAttempts: 0,
+        maxFailedAttempts,
+        postLimitAction,
+        lockedUntil: null,
+        isLockedOut: false,
+        securityEvents: [],
+        expiresAt: expiresAtIso,
+        maxViews: maxViewsNum && !isNaN(maxViewsNum) ? maxViewsNum : null,
+        currentViews: 0,
+        isExpired: false,
+        isRevoked: false,
+        burnOnRead: enableSelfDestruct,
+        enableWatermark,
+        watermarkConfig: enableWatermark ? {
+          text: watermarkText,
+          font: watermarkFont,
+          density: watermarkDensity,
+          rotation: watermarkRotation,
+          opacity: watermarkOpacity
+        } : undefined,
+        domainType,
+        brandedUrl: fullBrandedUrl,
+        analytics: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      ShareLinkStore.saveShareLink(record);
+      if (isMounted) refreshFileLinks();
     };
 
-    ShareLinkStore.saveShareLink(record);
-    refreshFileLinks();
+    generateLink();
+    return () => { isMounted = false; };
   }, [
-    file.id, file.name, file.size, file.type, userEmail, domainType, shareCode,
+    file.id, file.name, file.size, file.type, file.previewUrl, file.dataUrl, file.b2FinalUrl, userEmail, domainType, shareCode,
     customAlias, useCustomAlias, aliasError, accessTier, expiryOption, customExpiryDate,
     maxViewsInput, enableSelfDestruct, passwordPin, maxFailedAttempts, postLimitAction,
     enableWatermark, watermarkText, watermarkFont, watermarkDensity, watermarkRotation,
@@ -197,49 +221,6 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
         .catch(err => console.warn('QR Code generation error:', err));
     }
   }, [generatedLink]);
-
-  // Render Real-time Watermarked Image Canvas Preview
-  useEffect(() => {
-    if (isImage && file.previewUrl && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        canvas.width = img.width || 800;
-        canvas.height = img.height || 600;
-
-        // Draw original image
-        ctx.drawImage(img, 0, 0);
-
-        // Draw Watermark Overlay if enabled
-        if (enableWatermark) {
-          ctx.save();
-          ctx.translate(canvas.width / 2, canvas.height / 2);
-          ctx.rotate((watermarkRotation * Math.PI) / 180);
-
-          const fontSize = Math.max(14, Math.floor(canvas.width / 24));
-          const fontFamily = watermarkFont === 'mono' ? 'monospace' : watermarkFont === 'serif' ? 'serif' : 'sans-serif';
-          ctx.font = `bold ${fontSize}px ${fontFamily}`;
-
-          const opacityVal = watermarkOpacity / 100;
-          ctx.fillStyle = `rgba(245, 183, 0, ${opacityVal})`;
-          ctx.shadowColor = 'rgba(0,0,0,0.8)';
-          ctx.shadowBlur = 6;
-          ctx.textAlign = 'center';
-
-          const stepY = watermarkDensity === 'low' ? canvas.height / 3 : watermarkDensity === 'high' ? canvas.height / 7 : canvas.height / 5;
-          for (let y = -canvas.height; y < canvas.height; y += stepY) {
-            ctx.fillText(watermarkText, 0, y);
-          }
-          ctx.restore();
-        }
-      };
-      img.src = file.previewUrl;
-    }
-  }, [isImage, file.previewUrl, enableWatermark, watermarkText, watermarkFont, watermarkDensity, watermarkRotation, watermarkOpacity]);
 
   // Copy Link Handler
   const handleCopyLink = () => {
@@ -323,53 +304,16 @@ export const ShareManagementPage: React.FC<ShareManagementPageProps> = ({ file, 
               </span>
             </div>
 
-            {/* Media Canvas Box */}
-            <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-slate-950 border border-white/10 flex items-center justify-center group">
-              {isImage && file.previewUrl ? (
-                <canvas ref={canvasRef} className="w-full h-full object-contain" />
-              ) : isVideo && file.previewUrl ? (
-                <div className="relative w-full h-full">
-                  <video
-                    src={file.previewUrl}
-                    controls
-                    preload="metadata"
-                    controlsList="nodownload"
-                    className="w-full h-full object-contain"
-                  />
-                  {enableWatermark && (
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-15deg] text-amber-400/40 text-sm font-mono font-bold select-none text-center p-4">
-                      {watermarkText}
-                    </div>
-                  )}
-                </div>
-              ) : isPdf && file.previewUrl ? (
-                <div className="relative w-full h-full bg-slate-900 overflow-hidden">
-                  <iframe
-                    src={file.previewUrl}
-                    title={file.name}
-                    className="w-full h-full bg-white/95"
-                  />
-                  {enableWatermark && (
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-20deg] text-amber-400/40 text-xs font-mono font-bold select-none p-4">
-                      {watermarkText}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-6 text-center space-y-3 relative">
-                  <div className="w-14 h-14 mx-auto rounded-2xl bg-[#F5B700]/10 border border-[#F5B700]/30 flex items-center justify-center text-[#F5B700]">
-                    <Lock className="w-8 h-8" />
-                  </div>
-                  <div className="font-bold text-xs text-white">{file.name}</div>
-                  <div className="text-[11px] text-slate-400 font-mono">{file.size} • Encrypted Document Payload</div>
-                  {enableWatermark && (
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-20deg] text-amber-400/30 text-xs font-mono font-bold select-none p-4">
-                      {watermarkText}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Universal Live Recipient Stream Preview Engine */}
+            <LiveRecipientStreamPreview
+              file={file}
+              recipientEmail={recipientEmailInput || 'recipient@company.com'}
+              enableWatermark={enableWatermark}
+              watermarkText={watermarkText}
+              watermarkFont={watermarkFont}
+              watermarkDensity={watermarkDensity}
+              watermarkRotation={watermarkRotation}
+            />
 
             {/* Watermark Customizer Accordion */}
             <div className="border-t border-white/10 pt-3 space-y-3">

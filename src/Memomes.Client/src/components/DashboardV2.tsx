@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  FolderPlus, ShieldCheck, Grid, List, Star, Trash2, Eye, Share2
+  FolderPlus, ShieldCheck, Grid, List, Star, Trash2, Eye, Share2, Music
 } from 'lucide-react';
 import { FilePreviewLightboxModal } from './FilePreviewLightboxModal';
 import { ShareManagementPage } from './ShareManagementPage';
@@ -14,6 +14,7 @@ import { MobileBottomNav } from './MobileBottomNav';
 import { WelcomeHeroCard } from './WelcomeHeroCard';
 import { AISearchSection } from './AISearchSection';
 import { SecurityStatusWidget } from './SecurityStatusWidget';
+import { DeviceSecurityModal } from './DeviceSecurityModal';
 import { StorageAnalyticsWidget } from './StorageAnalyticsWidget';
 import { ActivityTimelineWidget } from './ActivityTimelineWidget';
 import { AIIntelligencePage } from '../pages/AIIntelligencePage';
@@ -22,6 +23,8 @@ import { ProfileSettingsPage } from '../pages/ProfileSettingsPage';
 
 import { LocalVaultDb } from '../utils/localVaultDb';
 import { b2SyncWorker } from '../utils/b2SyncWorker';
+import { auditLogger } from '../utils/auditLogger';
+import { StoragePathBuilder } from '../utils/storagePathBuilder';
 
 export interface FileItem {
   id: string;
@@ -33,7 +36,7 @@ export interface FileItem {
   sharesCount: number;
   fileNameEncrypted: string;
   previewUrl?: string;
-  category: 'image' | 'video' | 'document' | 'archive' | 'other';
+  category: 'image' | 'video' | 'document' | 'archive' | 'audio' | 'spreadsheet' | 'presentation' | 'code' | 'pdf' | 'other' | string;
   badgeColor?: string;
   badgeType?: string;
   b2Synced?: boolean;
@@ -42,6 +45,8 @@ export interface FileItem {
   contentHash?: string;
   contentTypeEncrypted?: string;
   thumbnailUrl?: string;
+  dataUrl?: string;
+  b2FinalUrl?: string;
   tags?: string[];
   createdAt?: string;
   activeSharesCount?: number;
@@ -76,6 +81,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
   const [selectedFileForPreview, setSelectedFileForPreview] = useState<FileItem | null>(null);
   const [selectedFileForShareManagement, setSelectedFileForShareManagement] = useState<FileItem | null>(null);
   const [showEnterpriseUploadModal, setShowEnterpriseUploadModal] = useState(false);
+  const [showDeviceSecurityModal, setShowDeviceSecurityModal] = useState(false);
 
   // Full Screen Upload Experience Overlay State
   const [showFullScreenUploadOverlay, setShowFullScreenUploadOverlay] = useState(false);
@@ -118,118 +124,46 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
     }
   };
 
-  // Main file collection
-  const [files, setFiles] = useState<FileItem[]>([
-    {
-      id: 'file-01',
-      name: 'Passport_Scan_Official.pdf',
-      size: '1.8 MB',
-      type: 'Documents',
-      updatedAt: 'Just now',
-      isFavorite: true,
-      sharesCount: 1,
-      fileNameEncrypted: 'e3b0c442...pdf.enc',
-      category: 'document',
-      badgeColor: '#EF4444',
-      badgeType: 'PDF',
-      b2Synced: true
-    },
-    {
-      id: 'file-02',
-      name: 'Tax_Return_Form_1040_2025.pdf',
-      size: '2.4 MB',
-      type: 'Documents',
-      updatedAt: '1 hour ago',
-      isFavorite: true,
-      sharesCount: 3,
-      fileNameEncrypted: 'f8a1d990...pdf.enc',
-      category: 'document',
-      badgeColor: '#22C55E',
-      badgeType: 'PDF',
-      b2Synced: true
-    },
-    {
-      id: 'file-03',
-      name: 'Q3_Financial_Audit_2025.pdf',
-      size: '4.2 MB',
-      type: 'Documents',
-      updatedAt: 'Yesterday',
-      isFavorite: false,
-      sharesCount: 12,
-      fileNameEncrypted: 'c90a1b22...pdf.enc',
-      category: 'document',
-      badgeColor: '#F5B700',
-      badgeType: 'DOC',
-      b2Synced: true
-    },
-    {
-      id: 'file-04',
-      name: 'Executive_Presentation_Keynote.png',
-      size: '6.5 MB',
-      type: 'Images',
-      updatedAt: '2 days ago',
-      isFavorite: false,
-      sharesCount: 0,
-      fileNameEncrypted: 'a1b2c3d4...png.enc',
-      category: 'image',
-      badgeColor: '#8B5CF6',
-      badgeType: 'IMG',
-      b2Synced: true,
-      previewUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'
-    }
-  ]);
+  // Main file collection — driven strictly by real database metadata and storage objects
+  const [files, setFiles] = useState<FileItem[]>([]);
 
-  // Load persistent vault files on mount
-  useEffect(() => {
+  // Shared helper to reload files from vault DB into Dashboard state
+  const reloadDashboardFiles = useCallback(() => {
     try {
       const stored = LocalVaultDb.getAllFiles();
-      if (stored && stored.length > 0) {
-        const mapped: FileItem[] = stored.map(s => {
-            const isVideo = s.category === 'video' || s.type?.startsWith('video/') || /\.(mp4|mov|mkv|avi|webm|m4v)$/i.test(s.name);
-            const isImage = s.category === 'image' || s.type?.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(s.name);
-            const ext = s.name?.split('.').pop()?.toUpperCase() || 'FILE';
-            return {
-              id: s.id,
-              name: s.name,
-              size: s.size || '1.2 MB',
-              type: s.type || 'Encrypted Payload',
-              updatedAt: s.updatedAt || 'Recently',
-              isFavorite: false,
-              sharesCount: 0,
-              fileNameEncrypted: s.fileNameEncrypted || `${s.id.slice(0, 8)}.enc`,
-              previewUrl: s.dataUrl,
-              category: isVideo ? 'video' : isImage ? 'image' : ((s.category as any) || 'document'),
-              badgeColor: isVideo ? '#8B5CF6' : isImage ? '#22C55E' : '#EF4444',
-              badgeType: isVideo ? ext : isImage ? 'IMG' : ext,
-              b2Synced: s.b2Synced || false
-            };
-          });
-
-        setFiles(prev => {
-          const prevIds = new Set(prev.map(p => p.id));
-          const newUnique = mapped.filter(m => !prevIds.has(m.id));
-          return [...newUnique, ...prev];
-        });
-      }
+      const mapped: FileItem[] = stored.map(s => {
+        const classifiedType = StoragePathBuilder.classifyFileType(s.type, s.name);
+        const ext = s.name?.split('.').pop()?.toUpperCase() || 'FILE';
+        return {
+          id: s.id,
+          name: s.name,
+          size: s.size || '1.2 MB',
+          type: s.type || 'Encrypted Payload',
+          updatedAt: s.updatedAt || 'Recently',
+          isFavorite: false,
+          sharesCount: 0,
+          fileNameEncrypted: s.fileNameEncrypted || `${s.id.slice(0, 8)}.enc`,
+          previewUrl: s.dataUrl,
+          category: classifiedType.toLowerCase() as any,
+          badgeColor: classifiedType === 'Audio' ? '#F5B700' : classifiedType === 'Presentations' ? '#EA580C' : classifiedType === 'Videos' ? '#8B5CF6' : classifiedType === 'Images' ? '#22C55E' : '#3B8BEB',
+          badgeType: ext,
+          b2Synced: s.b2Synced || false
+        };
+      });
+      setFiles(mapped);
     } catch (e) {
       console.warn('Could not load stored files from LocalVaultDb', e);
     }
   }, []);
 
-  // Subscribe to B2 sync worker — refresh b2Synced badge on files after each sync cycle
+  // Load persistent vault files on mount & subscribe to B2 sync worker
   useEffect(() => {
+    reloadDashboardFiles();
     const unsubscribe = b2SyncWorker.subscribe(() => {
-      // Re-read all files from storage to pick up latest b2Synced flags
-      const updated = LocalVaultDb.getAllFiles();
-      if (updated.length === 0) return;
-      const b2Map = new Map(updated.map(f => [f.id, f.b2Synced ?? false]));
-      setFiles(prev => prev.map(f => ({
-        ...f,
-        b2Synced: b2Map.has(f.id) ? b2Map.get(f.id)! : f.b2Synced
-      })));
+      reloadDashboardFiles();
     });
     return unsubscribe;
-  }, []);
+  }, [reloadDashboardFiles]);
 
 
   const addActivityLog = (action: string, details: string, status: 'Success' | 'Encrypted' | 'Warning' | 'Purged' = 'Success') => {
@@ -336,7 +270,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
               {/* Security & Storage Analytics Widgets */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <SecurityStatusWidget
-                  onOpenControlCenter={() => setActiveTab('control-center')}
+                  onOpenControlCenter={() => setShowDeviceSecurityModal(true)}
                 />
                 <StorageAnalyticsWidget
                   onUpgradeClick={() => setActiveTab('settings')}
@@ -444,6 +378,19 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
                               onClick={() => setSelectedFileForPreview(file)}
                               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
+                          ) : ((file.category as string) === 'audio' || file.type?.startsWith('audio/') || file.name?.match(/\.(mp3|wav|flac|aac|m4a|ogg)$/i)) ? (
+                            <div
+                              className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 cursor-pointer border border-amber-500/20 group/audio"
+                              onClick={() => setSelectedFileForPreview(file)}
+                            >
+                              <div className="w-9 h-9 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-[#F5B700] shadow-md group-hover/audio:scale-110 transition-transform">
+                                <Music className="w-4 h-4" />
+                              </div>
+                              <span className="text-[10px] font-mono text-amber-400 font-bold">Audio Track • {file.name.split('.').pop()?.toUpperCase()}</span>
+                              <button className="px-2.5 py-0.5 rounded-lg bg-[#F5B700] text-slate-950 font-bold text-[10px] flex items-center gap-1 shadow-md">
+                                <Eye className="w-3 h-3" /> Listen Audio
+                              </button>
+                            </div>
                           ) : (
                             /* Document / Archive / Unknown — styled placeholder */
                             <div
@@ -530,7 +477,8 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
 
           {activeTab === 'ai-intelligence' && <AIIntelligencePage />}
           {activeTab === 'control-center' && <ControlCenterPage />}
-          {activeTab === 'settings' && <ProfileSettingsPage userEmail={userEmail} />}
+          {activeTab === 'settings' && <ProfileSettingsPage userEmail={userEmail} onResetComplete={reloadDashboardFiles} />}
+          {activeTab === 'devtools' && <ProfileSettingsPage userEmail={userEmail} onResetComplete={reloadDashboardFiles} />}
           {activeTab === 'secure-vault' && <ControlCenterPage />}
         </main>
       </div>
@@ -545,28 +493,11 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
       {/* Enterprise Storage Upload Modal */}
       {showEnterpriseUploadModal && (
         <EnterpriseUploadModal
+          isOpen={showEnterpriseUploadModal}
           onClose={() => setShowEnterpriseUploadModal(false)}
           onUploadSuccess={() => {
             setShowEnterpriseUploadModal(false);
-            const updated = LocalVaultDb.getAllFiles();
-            if (updated && updated.length > 0) {
-              const mapped: FileItem[] = updated.map(s => ({
-                id: s.id,
-                name: s.name,
-                size: s.size || '1.2 MB',
-                type: s.type || 'Encrypted Payload',
-                updatedAt: s.updatedAt || 'Recently',
-                isFavorite: false,
-                sharesCount: 0,
-                fileNameEncrypted: s.fileNameEncrypted || `${s.id.slice(0, 8)}.enc`,
-                previewUrl: s.dataUrl,
-                category: s.category as any || 'document',
-                badgeColor: '#F5B700',
-                badgeType: 'FILE',
-                b2Synced: s.b2Synced || false
-              }));
-              setFiles(mapped);
-            }
+            reloadDashboardFiles();
           }}
         />
       )}
@@ -605,40 +536,43 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
             }
           }}
           onUploadSuccess={(uploadedQueue) => {
-            // Save uploaded files to LocalVaultDb
-            uploadedQueue.forEach((item) => {
-              if (item.status === 'Complete') {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                  LocalVaultDb.saveFile(item.id, item.name, item.file.type, (e.target?.result as string) || '');
-                };
-                reader.readAsDataURL(item.file);
-              }
+            const completeItems = uploadedQueue.filter((i) => i.status === 'Complete');
+
+            Promise.all(
+              completeItems.map(
+                (item) =>
+                  new Promise<{ id: string; name: string; file: File; dataUrl: string }>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                      const dataUrl = (e.target?.result as string) || '';
+                      resolve({ id: item.id, name: item.name, file: item.file, dataUrl });
+                    };
+                    reader.onerror = () => {
+                      resolve({ id: item.id, name: item.name, file: item.file, dataUrl: '' });
+                    };
+                    reader.readAsDataURL(item.file);
+                  })
+              )
+            ).then((results) => {
+              results.forEach(({ id, name, file, dataUrl }) => {
+                const classifiedType = StoragePathBuilder.classifyFileType(file.type, name);
+                LocalVaultDb.saveFile(id, name, file.type, dataUrl, {
+                  size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                  category: classifiedType.toLowerCase() as any,
+                  updatedAt: 'Just now'
+                });
+
+                auditLogger.logFileActivity(
+                  name,
+                  'UPLOAD_COMPLETED',
+                  'Stored zero-knowledge encrypted payload in vault',
+                  classifiedType
+                );
+              });
+
+              b2SyncWorker.triggerSync('Full-Screen Upload Complete');
+              reloadDashboardFiles();
             });
-
-            // Update main file list state
-            const newFileItems: FileItem[] = uploadedQueue
-              .filter((i) => i.status === 'Complete')
-              .map((item) => ({
-                id: item.id,
-                name: item.name,
-                size: `${(item.sizeBytes / (1024 * 1024)).toFixed(2)} MB`,
-                type: item.file.type || 'Encrypted File',
-                updatedAt: 'Just now',
-                isFavorite: false,
-                sharesCount: 0,
-                fileNameEncrypted: `${item.id.slice(0, 8)}.enc`,
-                category: item.file.type.startsWith('image/')
-                  ? 'image'
-                  : item.file.type.startsWith('video/')
-                  ? 'video'
-                  : 'document',
-                badgeColor: '#F5B700',
-                badgeType: item.name.split('.').pop()?.toUpperCase() || 'FILE',
-                b2Synced: true
-              }));
-
-            setFiles((prev) => [...newFileItems, ...prev]);
           }}
         />
       )}
@@ -648,6 +582,14 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
         <SecureShareModal
           file={selectedFileForShare}
           onClose={() => setSelectedFileForShare(null)}
+        />
+      )}
+
+      {/* Device & Session Security Center Modal */}
+      {showDeviceSecurityModal && (
+        <DeviceSecurityModal
+          userEmail={userEmail}
+          onClose={() => setShowDeviceSecurityModal(false)}
         />
       )}
     </div>
