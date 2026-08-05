@@ -25,8 +25,9 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
   const isPdf = contentType.includes('pdf') || fileName.endsWith('.pdf');
   const isOfficeDoc = fileName.endsWith('.docx') || fileName.endsWith('.pptx') || fileName.endsWith('.xlsx');
   const isArchive = contentType.includes('zip') || fileName.endsWith('.zip') || fileName.endsWith('.tar') || fileName.endsWith('.rar');
+  const isAudio = contentType.startsWith('audio/') || fileName.endsWith('.mp3') || fileName.endsWith('.wav') || fileName.endsWith('.aac') || fileName.endsWith('.ogg') || fileName.endsWith('.flac');
+  const isTextOrCode = fileName.endsWith('.txt') || fileName.endsWith('.md') || fileName.endsWith('.json') || fileName.endsWith('.py') || fileName.endsWith('.js') || fileName.endsWith('.ts') || fileName.endsWith('.tsx') || fileName.endsWith('.cpp') || fileName.endsWith('.sql');
 
-  // Backend cached preview URL fallback
   const backendPreviewUrl = `/api/files/${fileId}/preview`;
 
   return (
@@ -70,8 +71,22 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
           </div>
           <span className="text-[11px] font-bold text-accent-blue">PDF Page 1 Preview</span>
         </div>
+      ) : isAudio ? (
+        /* 4. Audio Waveform Preview */
+        <div className="w-full h-full p-4 flex flex-col items-center justify-center bg-gradient-to-br from-purple-950/40 to-surface text-center">
+          <div className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center mb-2">
+            <Play className="w-6 h-6 text-purple-400 ml-0.5" />
+          </div>
+          <span className="text-[11px] font-bold text-purple-300">Audio Track</span>
+        </div>
+      ) : isTextOrCode ? (
+        /* 5. Code & Text Syntax Preview */
+        <div className="w-full h-full p-4 flex flex-col items-center justify-center bg-gradient-to-br from-pink-950/30 to-surface text-center">
+          <FileCode className="w-10 h-10 text-pink-400 mb-2" />
+          <span className="text-[11px] font-bold text-pink-300">{fileName.split('.').pop()?.toUpperCase()} Source Code</span>
+        </div>
       ) : isOfficeDoc ? (
-        /* 4. Office DOCX/PPTX/XLSX Preview */
+        /* 6. Office DOCX/PPTX/XLSX Preview */
         <div className="w-full h-full p-4 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-surface text-center">
           <div className="w-14 h-16 bg-surface-card border-2 border-amber-500/50 rounded-lg p-2 flex flex-col justify-between mb-2 shadow-lg group-hover:border-amber-500 transition">
             <span className="text-[9px] font-bold text-accent-gold tracking-wider">
@@ -85,18 +100,18 @@ export const FilePreviewRenderer: React.FC<FilePreviewRendererProps> = ({
           <span className="text-[11px] font-bold text-accent-gold">Office Document</span>
         </div>
       ) : isArchive ? (
-        /* 5. ZIP Archive Rich Card with Metadata */
+        /* 7. ZIP Archive Rich Card with Metadata */
         <div className="w-full h-full p-4 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-950/40 to-surface text-center">
           <Archive className="w-10 h-10 text-accent-green mb-2" />
-          <span className="text-[11px] font-bold text-accent-green">Encrypted ZIP Archive</span>
-          <span className="text-[10px] text-gray-400 font-mono mt-0.5">{(sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
+          <span className="text-[11px] font-bold text-accent-green">Encrypted Archive</span>
+          <span className="text-[10px] text-gray-400 font-mono mt-0.5">{(sizeBytes / (1024 * 1024)).toFixed(1)} MB</span>
         </div>
       ) : (
-        /* Fallback: Rich File Icon with Metadata */
+        /* 8. Unsupported / Generic File Information Badge */
         <div className="w-full h-full p-4 flex flex-col items-center justify-center bg-surface text-center">
           <FileCode className="w-10 h-10 text-gray-400 mb-2" />
           <span className="text-[11px] font-bold text-gray-300 truncate px-2">{fileName.split('.').pop()?.toUpperCase() || 'FILE'}</span>
-          <span className="text-[10px] text-gray-500 font-mono mt-0.5">{(sizeBytes / 1024 / 1024).toFixed(1)} MB</span>
+          <span className="text-[10px] text-gray-500 font-mono mt-0.5">{(sizeBytes / (1024 * 1024)).toFixed(1)} MB</span>
         </div>
       )}
 

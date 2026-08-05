@@ -454,7 +454,7 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
             </>
           )}
 
-          {(activeTab === 'files' || activeTab.startsWith('files-') || activeTab === 'shared' || activeTab === 'favorites' || activeTab === 'recent' || activeTab === 'recycle-bin') && (
+          {(activeTab === 'files' || activeTab === 'my-files' || activeTab === 'myfiles' || activeTab.startsWith('files-') || activeTab.startsWith('my-files-') || activeTab === 'shared' || activeTab === 'favorites' || activeTab === 'recent' || activeTab === 'recycle-bin') && (
             <EnterpriseFileExplorer
               userEmail={userEmail}
               onOpenUpload={() => setShowEnterpriseUploadModal(true)}
@@ -469,17 +469,25 @@ export const DashboardV2: React.FC<DashboardV2Props> = ({ userEmail, onLogout })
 
           {activeTab === 'share-management' && (
             <ShareManagementPage
-              file={selectedFileForShareManagement || files[0]}
+              file={selectedFileForShareManagement || files[0] || {
+                id: 'default-file',
+                name: 'Confidential_Document.pdf',
+                size: '1.2 MB',
+                type: 'application/pdf',
+                updatedAt: 'Just now',
+                isFavorite: false,
+                sharesCount: 0,
+                fileNameEncrypted: 'default.enc',
+                category: 'document'
+              }}
               userEmail={userEmail}
-              onBack={() => setActiveTab('dashboard')}
+              onBack={() => setActiveTab('files')}
             />
           )}
 
           {activeTab === 'ai-intelligence' && <AIIntelligencePage />}
-          {activeTab === 'control-center' && <ControlCenterPage />}
-          {activeTab === 'settings' && <ProfileSettingsPage userEmail={userEmail} onResetComplete={reloadDashboardFiles} />}
-          {activeTab === 'devtools' && <ProfileSettingsPage userEmail={userEmail} onResetComplete={reloadDashboardFiles} />}
-          {activeTab === 'secure-vault' && <ControlCenterPage />}
+          {(activeTab === 'control-center' || activeTab === 'security' || activeTab === 'secure-vault') && <ControlCenterPage />}
+          {(activeTab === 'settings' || activeTab === 'devtools' || activeTab === 'profile') && <ProfileSettingsPage userEmail={userEmail} onResetComplete={reloadDashboardFiles} />}
         </main>
       </div>
 

@@ -30,11 +30,6 @@ export class StoragePathBuilder {
   }
 
   static generateStoragePath(params: StoragePathParams): StoragePathResult {
-    const res = ObjectKeyGenerator.generateObjectKey(params);
-    return {
-      ...res,
-      tenantId: res.tenantId || 'tenant001',
-      companyId: res.companyId || 'company001'
-    };
+    return ObjectKeyGenerator.generateObjectKey(params);
   }
 }

@@ -55,12 +55,7 @@ public class StorageIdentityService : IStorageIdentityService
     public string SanitizeStorageId(string prefix, string? existingId)
     {
         if (!string.IsNullOrWhiteSpace(existingId) && 
-            existingId.StartsWith($"{prefix}_") && 
-            !existingId.Contains("001") &&
-            !existingId.Contains("tenant") &&
-            !existingId.Contains("company") &&
-            !existingId.Contains("user001") &&
-            !existingId.Contains("workspace001"))
+            existingId.StartsWith($"{prefix}_"))
         {
             return existingId.Trim();
         }

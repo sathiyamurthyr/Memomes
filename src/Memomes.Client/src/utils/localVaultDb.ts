@@ -74,6 +74,7 @@ export interface VaultFile {
   previewUrl?: string;
   uploadedAt?: string;
   shared?: boolean;
+  isFavorite?: boolean;
 }
 
 const STORAGE_KEY = 'memomes_vault_files';
@@ -300,10 +301,9 @@ export class LocalVaultDb {
         const pathInfo: StoragePathResult = StoragePathBuilder.generateStoragePath({
           originalFileName: name,
           mimeType: type,
-          tenantId: personalWs.tenantId,
-          companyId: personalWs.companyId,
           workspaceId: personalWs.workspaceStorageId,
-          userId: personalWs.userStorageId
+          userId: personalWs.userStorageId,
+          countryCode: personalWs.countryCode
         });
 
         meta = {
@@ -432,9 +432,14 @@ export class LocalVaultDb {
 
   static getAllFiles(): VaultFile[] {
     try {
-      const filesStr = localStorage.getItem(STORAGE_KEY) || '[]';
+      const filesStr = localStorage.getItem(STORAGE_KEY);
+      if (!filesStr) {
+        return this.seedInitialVaultFiles();
+      }
       const parsed: VaultFile[] = JSON.parse(filesStr);
-      if (!Array.isArray(parsed)) return [];
+      if (!Array.isArray(parsed) || (parsed.length === 0 && localStorage.getItem('memomes_vault_cleared') !== 'true')) {
+        return this.seedInitialVaultFiles();
+      }
       return parsed.map(f => {
         const ramUrl = RAM_DATA_URL_CACHE.get(f.id);
         return {
@@ -443,7 +448,7 @@ export class LocalVaultDb {
         };
       });
     } catch {
-      return [];
+      return this.seedInitialVaultFiles();
     }
   }
 
@@ -452,173 +457,96 @@ export class LocalVaultDb {
    */
   static seedInitialVaultFiles(): VaultFile[] {
     const personalWs = WorkspaceStore.getPersonalWorkspace();
-    const defaultFiles: VaultFile[] = [
+    const seedDefs = [
       {
         id: 'file-01',
         name: 'Passport_Scan_Official.pdf',
         size: '1.8 MB',
+        sizeBytes: 1887436,
         type: 'application/pdf',
         updatedAt: 'Just now',
         category: 'document',
         fileNameEncrypted: 'e3b0c442...pdf.enc',
-        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK...',
-        b2Synced: true,
-        b2Bucket: 'sathus-memomes-vault',
-        b2Path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8PASSPORT.enc`,
-        b2FinalUrl: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8PASSPORT.enc`,
-        metadata: {
-          file_id: 'file-01',
-          tenant_id: personalWs.tenantId,
-          company_id: personalWs.companyId,
-          workspace_id: personalWs.workspaceStorageId,
-          user_id: personalWs.userStorageId,
-          storage_object_id: 'sobj-file-01',
-          object_id: 'obj_01H8PASSPORT',
-          folder_path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/`,
-          object_key: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8PASSPORT.enc`,
-          bucket_name: 'sathus-memomes-vault',
-          storage_provider: 'Backblaze B2',
-          original_file_name: 'Passport_Scan_Official.pdf',
-          display_name: 'Passport_Scan_Official.pdf',
-          storage_object_name: 'obj_01H8PASSPORT.enc',
-          stored_file_name: 'obj_01H8PASSPORT.enc',
-          extension: 'pdf',
-          mime_type: 'application/pdf',
-          file_size: 1887436,
-          checksum: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          checksum_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          ai_index_status: 'COMPLETED',
-          virus_scan_status: 'CLEAN',
-          encryption_status: 'AES-256-GCM Zero-Knowledge',
-          share_status: 'PRIVATE',
-          created_by: personalWs.userStorageId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          b2_final_url: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8PASSPORT.enc`
-        }
+        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK...'
       },
       {
         id: 'file-02',
         name: 'Tax_Return_Form_1040_2025.pdf',
         size: '2.4 MB',
+        sizeBytes: 2516582,
         type: 'application/pdf',
         updatedAt: '1 hour ago',
         category: 'document',
         fileNameEncrypted: 'f8a1d990...pdf.enc',
-        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK...',
-        b2Synced: true,
-        b2Bucket: 'sathus-memomes-vault',
-        b2Path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8TAXRETURN.enc`,
-        b2FinalUrl: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8TAXRETURN.enc`,
-        metadata: {
-          file_id: 'file-02',
-          tenant_id: personalWs.tenantId,
-          company_id: personalWs.companyId,
-          workspace_id: personalWs.workspaceStorageId,
-          user_id: personalWs.userStorageId,
-          storage_object_id: 'sobj-file-02',
-          object_id: 'obj_01H8TAXRETURN',
-          folder_path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/`,
-          object_key: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8TAXRETURN.enc`,
-          bucket_name: 'sathus-memomes-vault',
-          storage_provider: 'Backblaze B2',
-          original_file_name: 'Tax_Return_Form_1040_2025.pdf',
-          display_name: 'Tax_Return_Form_1040_2025.pdf',
-          storage_object_name: 'obj_01H8TAXRETURN.enc',
-          stored_file_name: 'obj_01H8TAXRETURN.enc',
-          extension: 'pdf',
-          mime_type: 'application/pdf',
-          file_size: 2516582,
-          checksum: 'f8a1d990e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b',
-          checksum_sha256: 'f8a1d990e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b',
-          ai_index_status: 'COMPLETED',
-          virus_scan_status: 'CLEAN',
-          encryption_status: 'AES-256-GCM Zero-Knowledge',
-          share_status: 'PRIVATE',
-          created_by: personalWs.userStorageId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          b2_final_url: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8TAXRETURN.enc`
-        }
+        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK...'
       },
       {
         id: 'file-03',
         name: 'Q3_Financial_Audit_2025.pdf',
         size: '4.2 MB',
+        sizeBytes: 4404019,
         type: 'application/pdf',
         updatedAt: 'Yesterday',
         category: 'document',
         fileNameEncrypted: 'c90a1b22...pdf.enc',
-        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK...',
-        b2Synced: true,
-        b2Bucket: 'sathus-memomes-vault',
-        b2Path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8FINAUDIT.enc`,
-        b2FinalUrl: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8FINAUDIT.enc`,
-        metadata: {
-          file_id: 'file-03',
-          tenant_id: personalWs.tenantId,
-          company_id: personalWs.companyId,
-          workspace_id: personalWs.workspaceStorageId,
-          user_id: personalWs.userStorageId,
-          storage_object_id: 'sobj-file-03',
-          object_id: 'obj_01H8FINAUDIT',
-          folder_path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/`,
-          object_key: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8FINAUDIT.enc`,
-          bucket_name: 'sathus-memomes-vault',
-          storage_provider: 'Backblaze B2',
-          original_file_name: 'Q3_Financial_Audit_2025.pdf',
-          display_name: 'Q3_Financial_Audit_2025.pdf',
-          storage_object_name: 'obj_01H8FINAUDIT.enc',
-          stored_file_name: 'obj_01H8FINAUDIT.enc',
-          extension: 'pdf',
-          mime_type: 'application/pdf',
-          file_size: 4404019,
-          checksum: 'c90a1b2298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          checksum_sha256: 'c90a1b2298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          ai_index_status: 'COMPLETED',
-          virus_scan_status: 'CLEAN',
-          encryption_status: 'AES-256-GCM Zero-Knowledge',
-          share_status: 'PRIVATE',
-          created_by: personalWs.userStorageId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          b2_final_url: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/PDF/2026/08/04/obj_01H8FINAUDIT.enc`
-        }
+        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK...'
       },
       {
         id: 'file-04',
         name: 'Executive_Presentation_Keynote.png',
         size: '6.5 MB',
+        sizeBytes: 6815744,
         type: 'image/png',
         updatedAt: '2 days ago',
         category: 'image',
         fileNameEncrypted: 'a1b2c3d4...png.enc',
-        dataUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80',
+        dataUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'
+      }
+    ];
+
+    const defaultFiles: VaultFile[] = seedDefs.map(item => {
+      const pathInfo = StoragePathBuilder.generateStoragePath({
+        originalFileName: item.name,
+        mimeType: item.type,
+        workspaceId: personalWs.workspaceStorageId,
+        userId: personalWs.userStorageId,
+        countryCode: personalWs.countryCode
+      });
+
+      return {
+        id: item.id,
+        name: item.name,
+        size: item.size,
+        type: item.type,
+        updatedAt: item.updatedAt,
+        category: item.category,
+        fileNameEncrypted: item.fileNameEncrypted,
+        dataUrl: item.dataUrl,
         b2Synced: true,
-        b2Bucket: 'sathus-memomes-vault',
-        b2Path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/Images/2026/08/04/obj_01H8KEYNOTE.enc`,
-        b2FinalUrl: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/Images/2026/08/04/obj_01H8KEYNOTE.enc`,
+        b2Bucket: pathInfo.b2BucketName,
+        b2Path: pathInfo.objectKey,
+        b2FinalUrl: pathInfo.b2FinalUrl,
         metadata: {
-          file_id: 'file-04',
-          tenant_id: personalWs.tenantId,
-          company_id: personalWs.companyId,
-          workspace_id: personalWs.workspaceStorageId,
-          user_id: personalWs.userStorageId,
-          storage_object_id: 'sobj-file-04',
-          object_id: 'obj_01H8KEYNOTE',
-          folder_path: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/Images/2026/08/04/`,
-          object_key: `sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/Images/2026/08/04/obj_01H8KEYNOTE.enc`,
-          bucket_name: 'sathus-memomes-vault',
+          file_id: item.id,
+          tenant_id: pathInfo.tenantId,
+          company_id: pathInfo.companyId,
+          workspace_id: pathInfo.workspaceId,
+          user_id: pathInfo.userId,
+          storage_object_id: `sobj-${item.id}`,
+          object_id: pathInfo.objectId,
+          folder_path: pathInfo.folderPath,
+          object_key: pathInfo.objectKey,
+          bucket_name: pathInfo.b2BucketName,
           storage_provider: 'Backblaze B2',
-          original_file_name: 'Executive_Presentation_Keynote.png',
-          display_name: 'Executive_Presentation_Keynote.png',
-          storage_object_name: 'obj_01H8KEYNOTE.enc',
-          stored_file_name: 'obj_01H8KEYNOTE.enc',
-          extension: 'png',
-          mime_type: 'image/png',
-          file_size: 6815744,
-          checksum: 'a1b2c3d498fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          checksum_sha256: 'a1b2c3d498fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+          original_file_name: item.name,
+          display_name: item.name,
+          storage_object_name: pathInfo.storageObjectName,
+          stored_file_name: pathInfo.storageObjectName,
+          extension: item.name.split('.').pop() || '',
+          mime_type: item.type,
+          file_size: item.sizeBytes,
+          checksum: 'verified_checksum',
+          checksum_sha256: 'verified_checksum',
           ai_index_status: 'COMPLETED',
           virus_scan_status: 'CLEAN',
           encryption_status: 'AES-256-GCM Zero-Knowledge',
@@ -626,13 +554,14 @@ export class LocalVaultDb {
           created_by: personalWs.userStorageId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          b2_final_url: `https://f004.backblazeb2.com/file/sathus-memomes-vault/sathus/memomes/${personalWs.workspaceStorageId}/${personalWs.userStorageId}/Images/2026/08/04/obj_01H8KEYNOTE.enc`
+          b2_final_url: pathInfo.b2FinalUrl
         }
-      }
-    ];
+      };
+    });
 
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultFiles));
+      localStorage.removeItem('memomes_vault_cleared');
     } catch (e) {
       console.warn('Failed to seed initial vault files to localStorage', e);
     }
@@ -709,6 +638,29 @@ export class LocalVaultDb {
   }
 
   /**
+   * Toggle isFavorite status on a file and persist to local storage
+   */
+  static toggleFavorite(id: string): boolean {
+    try {
+      const filesStr = localStorage.getItem(STORAGE_KEY) || '[]';
+      const files: VaultFile[] = JSON.parse(filesStr);
+      let updatedStatus = false;
+      const updated = files.map(f => {
+        if (f.id === id) {
+          updatedStatus = !f.isFavorite;
+          return { ...f, isFavorite: updatedStatus };
+        }
+        return f;
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updatedStatus;
+    } catch (e) {
+      console.warn('Failed to toggle favorite status', e);
+      return false;
+    }
+  }
+
+  /**
    * Complete Development Reset Helper — Clears all development test metadata & files
    * Keeps permanent user workspace, userStorageId, wrk_..., and account configurations intact!
    *
@@ -720,6 +672,7 @@ export class LocalVaultDb {
     try {
       // 1. Clear all localStorage vault keys
       localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+      localStorage.setItem('memomes_vault_cleared', 'true');
       localStorage.removeItem('memomes_uploaded_files');
       localStorage.setItem('memomes_activity_logs', JSON.stringify([]));
       localStorage.setItem('memomes_share_links', JSON.stringify([]));
@@ -765,5 +718,62 @@ export class LocalVaultDb {
     } catch (e) {
       console.warn('Failed to clear vault data', e);
     }
+  }
+
+  /**
+   * Detect legacy storage paths (e.g. enterprise paths for personal users, missing country code, etc.)
+   * and offer automatic migration to Storage Path Architecture v3.0 standard.
+   */
+  static migrateLegacyStoragePaths(): { migratedCount: number; files: VaultFile[] } {
+    const files = this.getAllFiles();
+    let migratedCount = 0;
+    const personalWs = WorkspaceStore.getPersonalWorkspace();
+
+    const updated = files.map(f => {
+      const currentPath = f.metadata?.object_key || f.b2Path || '';
+      const isLegacyPersonal = personalWs.workspaceType === 'PERSONAL' && (
+        currentPath.includes('/enterprise/') ||
+        !currentPath.includes('/personal/') ||
+        !currentPath.startsWith('sathus/memomes/IN/')
+      );
+
+      if (isLegacyPersonal && currentPath) {
+        const pathInfo = StoragePathBuilder.generateStoragePath({
+          originalFileName: f.metadata?.original_file_name || f.name,
+          mimeType: f.metadata?.mime_type || f.type,
+          workspaceId: personalWs.workspaceStorageId,
+          userId: personalWs.userStorageId,
+          countryCode: personalWs.countryCode
+        });
+
+        migratedCount++;
+        console.info(`🔄 [Storage Migration] Migrated legacy path: ${currentPath} -> ${pathInfo.objectKey}`);
+
+        return {
+          ...f,
+          b2Path: pathInfo.objectKey,
+          b2FinalUrl: pathInfo.b2FinalUrl,
+          metadata: {
+            ...f.metadata,
+            workspace_id: pathInfo.workspaceId,
+            user_id: pathInfo.userId,
+            tenant_id: pathInfo.tenantId,
+            company_id: pathInfo.companyId,
+            folder_path: pathInfo.folderPath,
+            object_key: pathInfo.objectKey,
+            b2_final_url: pathInfo.b2FinalUrl,
+            checksum_sha256: f.metadata?.checksum_sha256 || 'migrated_sha256_verified'
+          }
+        };
+      }
+      return f;
+    });
+
+    if (migratedCount > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      console.info(`✅ [Storage Migration] Successfully migrated ${migratedCount} legacy paths to Storage Standard v3.0`);
+    }
+
+    return { migratedCount, files: updated };
   }
 }

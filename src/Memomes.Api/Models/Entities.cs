@@ -11,11 +11,18 @@ public class StoredFile
     public string ContentTypeEncrypted { get; set; } = string.Empty;
     public long SizeBytes { get; set; }
     public string ContentHash { get; set; } = string.Empty;
+    public string FileHashSha256 { get; set; } = string.Empty;
     public string StoragePath { get; set; } = string.Empty;
     public string AccessTier { get; set; } = "FULL_CONTROL"; // VIEW_ONLY, READ_DOWNLOAD, FULL_CONTROL
     public bool IsColdStorage { get; set; } = false;
     public bool IsTrash { get; set; } = false;
     public DateTime? TrashCreatedAt { get; set; }
+    public int VersionNumber { get; set; } = 1;
+    public Guid? ParentFileId { get; set; }
+    public Guid? DuplicateOfId { get; set; }
+    public bool IsLatest { get; set; } = true;
+    public int UploadCount { get; set; } = 1;
+    public DateTime LastUploadedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastAccessedAt { get; set; } = DateTime.UtcNow;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
@@ -187,3 +194,19 @@ public class ShareLink
     public string Status { get; set; } = "ACTIVE";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+public class UserWorkspace
+{
+    [Key]
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid UserId { get; set; }
+    public string WorkspaceStorageId { get; set; } = string.Empty; // e.g. wrk_01J...
+    public string UserStorageId { get; set; } = string.Empty;      // e.g. usr_01J...
+    public string WorkspaceType { get; set; } = "PERSONAL";         // PERSONAL, BUSINESS, ENTERPRISE
+    public string CountryCode { get; set; } = "IN";                 // e.g. IN, US
+    public string? TenantId { get; set; }
+    public string? CompanyId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+

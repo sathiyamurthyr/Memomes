@@ -24,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<FileMetadata> FileMetadatas => Set<FileMetadata>();
     public DbSet<Folder> Folders => Set<Folder>();
     public DbSet<ShareLink> ShareLinks => Set<ShareLink>();
+    public DbSet<UserWorkspace> UserWorkspaces => Set<UserWorkspace>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,11 +33,24 @@ public class AppDbContext : DbContext
         // Register pgvector extension
         modelBuilder.HasPostgresExtension("vector");
 
-        // StoredFile indexes
+        // UserWorkspace indexing & unique constraints (1 personal workspace per user)
+        modelBuilder.Entity<UserWorkspace>()
+            .HasIndex(w => w.UserId)
+            .IsUnique();
+
+        modelBuilder.Entity<UserWorkspace>()
+            .HasIndex(w => w.WorkspaceStorageId)
+            .IsUnique();
+
+        // StoredFile indexes for duplicate file detection
         modelBuilder.Entity<StoredFile>()
             .HasIndex(f => f.UserId);
         modelBuilder.Entity<StoredFile>()
             .HasIndex(f => f.ContentHash);
+        modelBuilder.Entity<StoredFile>()
+            .HasIndex(f => new { f.UserId, f.ContentHash });
+        modelBuilder.Entity<StoredFile>()
+            .HasIndex(f => new { f.UserId, f.FileNameEncrypted });
         modelBuilder.Entity<StoredFile>()
             .HasIndex(f => f.LastAccessedAt);
 

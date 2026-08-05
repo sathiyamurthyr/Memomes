@@ -9,6 +9,7 @@ public enum WorkspaceType
 
 public record ObjectKeyRequest(
     string? WorkspaceType = null,
+    string? CountryCode = null,
     string? WorkspaceId = null,
     string? TenantId = null,
     string? CompanyId = null,
@@ -20,6 +21,7 @@ public record ObjectKeyRequest(
 
 public record ObjectKeyGenerationResult(
     WorkspaceType WorkspaceType,
+    string CountryCode,
     string WorkspaceId,
     string? TenantId,
     string? CompanyId,
@@ -47,10 +49,12 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
     private const string DefaultBucket = "sathus-memomes-vault";
     private const string BasePrefix = "sathus/memomes";
     private readonly IStorageIdentityService _identityService;
+    private readonly ILogger<ObjectKeyGeneratorService> _logger;
 
-    public ObjectKeyGeneratorService(IStorageIdentityService identityService)
+    public ObjectKeyGeneratorService(IStorageIdentityService identityService, ILogger<ObjectKeyGeneratorService> logger)
     {
         _identityService = identityService;
+        _logger = logger;
     }
 
     public WorkspaceType DetectWorkspaceType(ObjectKeyRequest request)
@@ -61,11 +65,6 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
             {
                 return parsed;
             }
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.TenantId) || !string.IsNullOrWhiteSpace(request.CompanyId))
-        {
-            return WorkspaceType.Business;
         }
 
         return WorkspaceType.Personal;
@@ -92,6 +91,7 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
     public ObjectKeyGenerationResult GenerateObjectKey(ObjectKeyRequest request)
     {
         var type = DetectWorkspaceType(request);
+        var countryCode = string.IsNullOrWhiteSpace(request.CountryCode) ? "IN" : request.CountryCode.ToUpper().Trim();
         var workspaceId = _identityService.SanitizeStorageId("wrk", request.WorkspaceId);
         var userId = _identityService.SanitizeStorageId("usr", request.UserId?.ToString());
         var fileType = ClassifyFileType(request.ContentType, request.OriginalFileName);
@@ -106,25 +106,32 @@ public class ObjectKeyGeneratorService : IObjectKeyGenerator
         var storageObjectName = $"{encryptedObjectId}.enc";
 
         string objectKey;
+        string? tenantId = null;
+        string? companyId = null;
 
         if (type == WorkspaceType.Personal)
         {
-            // Personal Format: sathus/memomes/{workspaceStorageId}/{userStorageId}/{fileType}/{YYYY}/{MM}/{DD}/{objectStorageId}.enc
-            objectKey = $"{BasePrefix}/{workspaceId}/{userId}/{fileType}/{year}/{month}/{day}/{storageObjectName}";
+            // Personal Standard: sathus/memomes/{countryCode}/personal/{workspaceStorageId}/{userStorageId}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
+            objectKey = $"{BasePrefix}/{countryCode}/personal/{workspaceId}/{userId}/{fileType}/{year}/{month}/{day}/{storageObjectName}";
         }
         else
         {
-            // Business/Enterprise Format: sathus/memomes/{workspaceStorageId}/{tenantId}/{companyId}/{userStorageId}/{fileType}/{YYYY}/{MM}/{DD}/{objectStorageId}.enc
-            var tenantId = string.IsNullOrWhiteSpace(request.TenantId) ? "tenant001" : request.TenantId.ToLower().Trim();
-            var companyId = string.IsNullOrWhiteSpace(request.CompanyId) ? "company001" : request.CompanyId.ToLower().Trim();
-            objectKey = $"{BasePrefix}/{workspaceId}/{tenantId}/{companyId}/{userId}/{fileType}/{year}/{month}/{day}/{storageObjectName}";
+            // Enterprise Standard: sathus/memomes/{countryCode}/enterprise/{tenantId}/{companyId}/{workspaceStorageId}/{userStorageId}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
+            tenantId = string.IsNullOrWhiteSpace(request.TenantId) ? "tenant001" : request.TenantId.ToLower().Trim();
+            companyId = string.IsNullOrWhiteSpace(request.CompanyId) ? "company001" : request.CompanyId.ToLower().Trim();
+            objectKey = $"{BasePrefix}/{countryCode}/enterprise/{tenantId}/{companyId}/{workspaceId}/{userId}/{fileType}/{year}/{month}/{day}/{storageObjectName}";
         }
+
+        _logger.LogInformation(
+            "\n====== MEMOMES CLOUD STORAGE PATH GENERATED ======\nAccount Type : {Type}\nCountry      : {Country}\nWorkspace    : {WorkspaceId}\nUser         : {UserId}\nGenerated Path: {ObjectKey}\n==========================================",
+            type.ToString().ToUpperInvariant(), countryCode, workspaceId, userId, objectKey);
 
         return new ObjectKeyGenerationResult(
             WorkspaceType: type,
+            CountryCode: countryCode,
             WorkspaceId: workspaceId,
-            TenantId: request.TenantId,
-            CompanyId: request.CompanyId,
+            TenantId: tenantId,
+            CompanyId: companyId,
             UserId: userId,
             FileType: fileType,
             Year: year,

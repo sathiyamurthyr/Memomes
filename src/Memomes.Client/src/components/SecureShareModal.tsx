@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Share2, Lock, Flame, Eye, Check,
-  Shield, X, Download, Copy, Sliders
+  Shield, X, Download, Copy, Sliders,
+  QrCode, Mail, MessageSquare
 } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
 import { getAppBaseUrl } from '../utils/urlHelper';
@@ -30,6 +31,7 @@ export const SecureShareModal: React.FC<SecureShareModalProps> = ({ file, onClos
   const [recipientEmail, setRecipientEmail] = useState('');
   const [generatedLink, setGeneratedLink] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
 
   /* Auto-generate share link on option changes */
   useEffect(() => {
@@ -140,6 +142,54 @@ export const SecureShareModal: React.FC<SecureShareModalProps> = ({ file, onClos
                 )}
               </button>
             </div>
+
+            {/* Quick Share Actions: QR Code, Email, WhatsApp */}
+            <div className="flex items-center justify-between pt-1 gap-2">
+              <button
+                onClick={() => setShowQrCode(!showQrCode)}
+                className="flex-1 h-8 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white font-mono text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                <span>{showQrCode ? 'Hide QR' : 'QR Code'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const subject = encodeURIComponent(`Secure File Share: ${file.name}`);
+                  const body = encodeURIComponent(`Here is your secure zero-knowledge link for ${file.name}:\n\n${generatedLink}`);
+                  window.open(`mailto:${recipientEmail}?subject=${subject}&body=${body}`, '_blank');
+                }}
+                className="flex-1 h-8 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white font-mono text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Mail className="w-3.5 h-3.5 text-blue-400" />
+                <span>Email</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const text = encodeURIComponent(`Here is your secure zero-knowledge link for ${file.name}: ${generatedLink}`);
+                  window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+                }}
+                className="flex-1 h-8 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white font-mono text-[11px] flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <span>WhatsApp</span>
+              </button>
+            </div>
+
+            {/* QR Code Display Overlay */}
+            {showQrCode && (
+              <div className="p-4 bg-[#070B14] rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-2 animate-in fade-in">
+                <div className="p-3 bg-white rounded-xl shadow-lg">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(generatedLink)}`}
+                    alt="Secure Share QR Code"
+                    className="w-32 h-32"
+                  />
+                </div>
+                <span className="text-[10px] font-mono text-slate-400">Scan with mobile camera for instant access</span>
+              </div>
+            )}
           </div>
 
           {/* Access Tier Segmented Controls */}

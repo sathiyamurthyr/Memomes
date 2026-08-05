@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  X, ShieldCheck, FileText, Video, Eye, Share2, Download, Edit3, FolderInput, Copy, Trash2, History, User, Sparkles, Activity, Clock, Terminal, Folder
+  X, FileText, Video, Eye, Share2, Download, Edit3, FolderInput, Copy, Trash2, History, User, Sparkles, Activity, Clock, Terminal, Folder
 } from 'lucide-react';
 import type { FileItem } from './DashboardV2';
+import { InlineFilePreviewContainer } from './InlineFilePreviewContainer';
 
 export type UserRole = 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_PLATFORM_ADMIN';
 
@@ -64,19 +65,12 @@ export const FileDetailsPanel: React.FC<FileDetailsPanelProps> = ({
         {/* 1. SECTION 1: PREVIEW */}
         <div className="space-y-1.5">
           <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">1. File Preview</span>
-          <div className="relative aspect-video w-full rounded-2xl bg-[#080D1A] border border-white/10 overflow-hidden flex items-center justify-center group shadow-lg">
-            {file.thumbnailUrl ? (
-              <img src={file.thumbnailUrl} alt="Preview" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
-            ) : (
-              <div className="text-center p-4 space-y-1">
-                <FileText className="w-8 h-8 text-[#F5C027] mx-auto" />
-                <span className="text-[10px] text-slate-400 font-mono block">Zero-Knowledge Encrypted Preview</span>
-              </div>
-            )}
-            <span className="absolute bottom-2.5 right-2.5 text-[10px] font-mono font-extrabold bg-[#080D1A]/90 text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/40 flex items-center gap-1 shadow-md">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" /> AES-256
-            </span>
-          </div>
+          <InlineFilePreviewContainer
+            file={file as any}
+            onOpenPreview={onOpenViewer as any}
+            onDownload={onOpenControlCenter as any}
+            heightClass="h-44"
+          />
         </div>
 
         {/* 8 ACTION BUTTONS GRID */}

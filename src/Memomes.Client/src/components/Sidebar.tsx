@@ -99,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   toggleMyFilesExpanded();
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all ${
-                  activeTab === 'files'
+                  activeTab === 'files' || activeTab === 'my-files' || activeTab === 'myfiles'
                     ? 'bg-[#F5B700]/15 text-white border border-[#F5B700]/30 shadow-sm'
                     : 'text-slate-200 hover:bg-white/5'
                 }`}
@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="pl-4 pr-1 py-1 space-y-0.5 border-l border-white/10 ml-5 mt-1">
                   {virtualFolders.map((sub) => {
                     const SubIcon = sub.icon;
-                    const isSubActive = activeTab === `files-${sub.id}`;
+                    const isSubActive = activeTab === `files-${sub.id}` || activeTab === `my-files-${sub.id}`;
                     return (
                       <button
                         key={sub.id}

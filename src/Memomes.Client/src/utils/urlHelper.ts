@@ -8,11 +8,11 @@ export const getAppBaseUrl = (): string => {
     const envUrl = (import.meta as any).env?.VITE_APP_URL || (import.meta as any).env?.NEXT_PUBLIC_APP_URL;
     if (envUrl) return envUrl;
     
-    // Standardize origin (e.g., http://localhost:6524 or http://192.168.0.104:6524)
+    // Standardize origin (e.g., http://localhost:6523 or http://192.168.0.100:6523)
     if (window.location.protocol === 'file:') {
-      return 'http://localhost:6524';
+      return 'http://localhost:6523';
     }
     return window.location.origin;
   }
-  return 'http://localhost:6524';
+  return 'http://localhost:6523';
 };

@@ -93,9 +93,11 @@ export const WatermarkedViewer: React.FC<WatermarkedViewerProps> = ({
           </div>
         ) : (
           <div className="relative p-6 bg-surface rounded-lg text-left font-mono text-sm text-gray-200 overflow-auto max-h-[60vh] select-none">
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-25deg] text-amber-400/30 text-xl font-bold text-center p-4">
-              {recipientEmail} | IP: {userIp} | {new Date().toLocaleDateString()}
-            </div>
+            {showWatermark && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center rotate-[-25deg] text-amber-400/30 text-xl font-bold text-center p-4">
+                {recipientEmail} | IP: {userIp} | {new Date().toLocaleDateString()}
+              </div>
+            )}
             <pre className="whitespace-pre-wrap">{textValue || 'Encrypted document contents...'}</pre>
           </div>
         )}

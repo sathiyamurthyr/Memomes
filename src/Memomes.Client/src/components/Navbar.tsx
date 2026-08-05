@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Upload, 
   Bell, 
   ShieldCheck, 
-  User, 
   Sparkles, 
   HardDrive, 
-  Lock, 
   LogOut, 
   ChevronDown,
-  Command
+  Command,
+  ShieldAlert,
+  X
 } from 'lucide-react';
 import { MemomesLogo } from './MemomesLogo';
+import { SecurityCenterStore, type SecurityAlert } from '../utils/securityCenterStore';
 
 interface NavbarProps {
   userEmail?: string;
@@ -23,7 +24,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  userEmail = 'user@memomes.com',
+  userEmail = 'sathiya@memomes.com',
   onOpenUpload,
   onOpenAISearch,
   onLogout,
@@ -31,15 +32,50 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
+  const [activeBanner, setActiveBanner] = useState<SecurityAlert | null>(null);
+
+  const loadAlerts = () => {
+    setAlerts(SecurityCenterStore.getSecurityAlerts());
+  };
+
+  useEffect(() => {
+    loadAlerts();
+
+    // Check offline alerts on fresh login
+    const offlineAlerts = SecurityCenterStore.flushOfflineAlertsOnLogin();
+    if (offlineAlerts.length > 0) {
+      setActiveBanner(offlineAlerts[0]);
+    }
+
+    const handleUpdate = () => loadAlerts();
+    const handleBanner = (e: Event) => {
+      const customEvent = e as CustomEvent<SecurityAlert>;
+      if (customEvent.detail) {
+        setActiveBanner(customEvent.detail);
+        loadAlerts();
+      }
+    };
+
+    window.addEventListener('memomes_security_center_updated', handleUpdate);
+    window.addEventListener('memomes_security_alert_banner', handleBanner);
+
+    return () => {
+      window.removeEventListener('memomes_security_center_updated', handleUpdate);
+      window.removeEventListener('memomes_security_alert_banner', handleBanner);
+    };
+  }, []);
+
+  const unreadCount = alerts.filter(a => a.status === 'UNREAD').length;
 
   return (
-    <header className="sticky top-0 z-40 w-full h-16 bg-[#070B14]/90 backdrop-blur-xl border-b border-white/10 px-4 md:px-6 flex items-center justify-between transition-all">
+    <header className="sticky top-0 z-40 w-full h-16 bg-[#070B14]/90 backdrop-blur-xl border-b border-white/10 px-4 md:px-6 flex items-center justify-between transition-all select-none font-sans">
       {/* Brand Logo & Security Badge */}
       <div className="flex items-center gap-4">
         <div className="cursor-pointer flex items-center gap-2" onClick={() => onNavigateTab('dashboard')}>
           <MemomesLogo size="md" showText={true} />
         </div>
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium font-mono">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
           <span>Zero-Knowledge Active</span>
         </div>
@@ -52,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="relative flex items-center w-full h-10 px-3.5 rounded-xl bg-[#0F172A]/80 border border-white/10 hover:border-[#F5B700]/50 transition-all cursor-pointer group shadow-inner"
         >
           <Search className="w-4 h-4 text-slate-400 group-hover:text-[#F5B700] transition-colors mr-2.5" />
-          <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors flex-1 truncate">
+          <span className="text-sm text-slate-400 group-hover:text-slate-200 transition-colors flex-1 truncate font-mono">
             Search files, extract insights, find passport or tax PDFs...
           </span>
           <div className="flex items-center gap-1.5 ml-2">
@@ -71,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Storage Bar Indicator */}
         <div 
           onClick={() => onNavigateTab('settings')}
-          className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0F172A]/90 border border-white/10 text-xs cursor-pointer hover:border-amber-500/30 transition-all"
+          className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0F172A]/90 border border-white/10 text-xs cursor-pointer hover:border-amber-500/30 transition-all font-mono"
         >
           <HardDrive className="w-3.5 h-3.5 text-[#F5B700]" />
           <div className="flex flex-col">
@@ -88,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Quick Upload CTA */}
         <button
           onClick={onOpenUpload}
-          className="btn-gold !h-9 !px-3.5 !text-xs"
+          className="btn-gold !h-9 !px-3.5 !text-xs font-mono"
         >
           <Upload className="w-3.5 h-3.5" />
           <span className="hidden sm:inline font-bold">Upload</span>
@@ -101,38 +137,56 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="p-2 rounded-xl bg-[#0F172A] border border-white/10 hover:border-white/20 text-slate-300 hover:text-white transition-all relative"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#F5B700] animate-pulse" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[9px] font-bold font-mono rounded-full bg-red-600 text-white border border-slate-950 animate-pulse">
+                {unreadCount}
+              </span>
+            )}
           </button>
 
           {/* Notifications Popover */}
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-[#0F172A] border border-white/10 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-[#0F172A] border border-white/10 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 font-sans">
               <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                <h4 className="text-xs font-semibold text-white uppercase tracking-wider">Security Alerts</h4>
-                <span className="text-[10px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full font-mono">2 New</span>
+                <h4 className="text-xs font-semibold text-white uppercase tracking-wider font-mono">Security Alerts</h4>
+                <span className="text-[10px] text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full font-mono font-bold">
+                  {unreadCount > 0 ? `${unreadCount} Critical Alert${unreadCount > 1 ? 's' : ''}` : '0 Unread'}
+                </span>
               </div>
-              <div className="space-y-2.5 text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-white/5 flex gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-slate-200 font-medium">Link Access Logged</p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">Guest viewed "Tax_Returns_2025.pdf" (Watermark Active)</p>
-                    <span className="text-[10px] text-slate-500">2 mins ago</span>
-                  </div>
+
+              {alerts.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-4 font-mono">No security alerts recorded.</p>
+              ) : (
+                <div className="space-y-2.5 text-xs max-h-72 overflow-y-auto scrollbar-thin">
+                  {alerts.map((alt) => (
+                    <div
+                      key={alt.id}
+                      onClick={() => onNavigateTab('security')}
+                      className={`p-3 rounded-xl border transition cursor-pointer ${
+                        alt.severity === 'HIGH' || alt.type === 'CRITICAL_ALERT'
+                          ? 'bg-red-950/30 border-red-500/30 hover:border-red-500/50'
+                          : 'bg-slate-900/80 border-white/5 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className={`p-1.5 rounded-lg shrink-0 ${
+                          alt.severity === 'HIGH' || alt.type === 'CRITICAL_ALERT' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          <ShieldAlert className="w-4 h-4" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-slate-200 font-bold text-xs">{alt.title}</p>
+                          <p className="text-slate-300 text-[11px] leading-tight font-mono">{alt.description}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono pt-1">
+                            <span>📍 {alt.location || 'India'}</span>
+                            <span>💻 {alt.device || 'Chrome / Windows'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-white/5 flex gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 shrink-0">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-slate-200 font-medium">Download Block Enforced</p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">Blocked external download attempt on shared file.</p>
-                    <span className="text-[10px] text-slate-500">1 hour ago</span>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -143,42 +197,71 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="flex items-center gap-2 p-1.5 rounded-xl bg-[#0F172A] border border-white/10 hover:border-amber-500/30 transition-all text-slate-200"
           >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-[#F5B700] text-slate-950 font-bold text-xs flex items-center justify-center shadow-md">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-[#F5B700] text-slate-950 font-bold text-xs flex items-center justify-center shadow-md font-mono">
               {userEmail.substring(0, 2).toUpperCase()}
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
 
           {showProfileMenu && (
-            <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#0F172A] border border-white/10 shadow-2xl p-2 z-50 animate-in fade-in">
-              <div className="px-3 py-2 border-b border-white/10 mb-1">
-                <p className="text-xs font-semibold text-white truncate">{userEmail}</p>
-                <p className="text-[11px] text-amber-400 flex items-center gap-1 mt-0.5">
-                  <ShieldCheck className="w-3 h-3" /> Pro Enterprise Plan
-                </p>
+            <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#0F172A] border border-white/10 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 font-sans">
+              <div className="p-2 border-b border-white/10">
+                <p className="text-xs font-bold text-white truncate">{userEmail}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Vault Storage Owner</p>
               </div>
-              <button 
+              <button
                 onClick={() => { setShowProfileMenu(false); onNavigateTab('settings'); }}
-                className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
+                className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition flex items-center gap-2"
               >
-                <User className="w-3.5 h-3.5 text-slate-400" /> Account Settings
+                Profile & Vault Settings
               </button>
-              <button 
-                onClick={() => { setShowProfileMenu(false); onNavigateTab('control-center'); }}
-                className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
-              >
-                <Lock className="w-3.5 h-3.5 text-[#F5B700]" /> Security Control Center
-              </button>
-              <button 
+              <button
                 onClick={onLogout}
-                className="w-full text-left px-3 py-2 rounded-xl text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2 mt-1 border-t border-white/5 pt-2"
+                className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-xl transition flex items-center gap-2 font-bold"
               >
-                <LogOut className="w-3.5 h-3.5" /> Sign Out
+                <LogOut className="w-3.5 h-3.5" /> Log Out
               </button>
             </div>
           )}
         </div>
       </div>
+
+      {/* ── TOP-RIGHT ANIMATED RED ALERT BANNER FOR ONLINE OWNER (Action 10) ──── */}
+      {activeBanner && (
+        <div className="fixed top-20 right-6 z-50 w-96 rounded-2xl bg-[#0B0F19]/95 backdrop-blur-2xl border border-red-500/50 p-4 shadow-2xl animate-bounce-short shadow-red-500/20 font-sans">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2 text-red-400 font-bold text-xs font-mono uppercase tracking-wider">
+              <ShieldAlert className="w-4 h-4 animate-pulse" />
+              <span>{activeBanner.title}</span>
+            </div>
+            <button onClick={() => setActiveBanner(null)} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-slate-200 text-xs mt-2 font-mono">{activeBanner.description}</p>
+          <div className="mt-2 text-[10px] text-slate-400 font-mono flex items-center gap-3">
+            <span>📍 Location: {activeBanner.location || 'India'}</span>
+            <span>💻 Device: {activeBanner.device || 'Chrome / Windows'}</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-[11px]">
+            <button
+              onClick={() => { setActiveBanner(null); onNavigateTab('security'); }}
+              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-center"
+            >
+              View Incident
+            </button>
+            <button
+              onClick={() => {
+                if (activeBanner.shareCode) SecurityCenterStore.unlockLink(activeBanner.shareCode);
+                setActiveBanner(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold border border-amber-500/30 text-center"
+            >
+              Unlock Link
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

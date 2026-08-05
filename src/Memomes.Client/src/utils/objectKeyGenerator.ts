@@ -1,22 +1,38 @@
 /**
  * Dynamic Object Key Generator Service for Memomes Cloud
+ * PRODUCTION STORAGE HIERARCHY STANDARD VERSION 2.0
  * 
- * Generates workspace-aware object keys based on workspace type:
- * 
- * PERSONAL WORKSPACE:
- * sathus/memomes/{workspaceId}/{userId}/{fileType}/{YYYY}/{MM}/{DD}/{encryptedObjectId}.enc
+ * 1. PERSONAL USERS:
+ * sathus/memomes/{countryCode}/personal/{workspaceStorageId}/{userStorageId}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
  * Example:
- * sathus/memomes/workspace001/user001/PDF/2026/08/03/f9b4d21c8e7a4d1b9c3a5e8f2d1c6ab.enc
+ * sathus/memomes/in/personal/wrk_01H8XMEMOMESCLOUDVAULT01/usr_01H8XMEMOMESCLOUDVAULT01/PDF/2026/08/05/obj_8d91e7a4f26bc39d.enc
  * 
- * BUSINESS / ENTERPRISE WORKSPACE:
- * sathus/memomes/{workspaceId}/{tenantId}/{companyId}/{userId}/{fileType}/{YYYY}/{MM}/{DD}/{encryptedObjectId}.enc
+ * 2. ENTERPRISE TENANTS:
+ * sathus/memomes/{countryCode}/enterprise/{tenantId}/{companyId}/{workspaceStorageId}/{userStorageId}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
  * Example:
- * sathus/memomes/workspace001/tenant001/company001/user001/PDF/2026/08/03/f9b4d21c8e7a4d1b9c3a5e8f2d1c6ab.enc
+ * sathus/memomes/in/enterprise/tenant001/company001/wrk_01H8XMEMOMESCLOUDVAULT01/usr_01H8XMEMOMESCLOUDVAULT01/PDF/2026/08/05/obj_8d91e7a4f26bc39d.enc
+ * 
+ * 3. BUSINESS ACCOUNTS:
+ * sathus/memomes/{countryCode}/business/{businessId}/{workspaceStorageId}/{userStorageId}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
+ * 
+ * 4. SYSTEM FILES:
+ * system/{subfolder}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
  */
 
 import { UlidEngine } from './ulid';
+import { WorkspaceStore } from './workspaceStore';
 
-export type WorkspaceType = 'PERSONAL' | 'BUSINESS' | 'ENTERPRISE';
+export type WorkspaceType = 'PERSONAL' | 'BUSINESS' | 'ENTERPRISE' | 'SYSTEM';
+
+export type SystemSubfolder =
+  | 'thumbnails'
+  | 'ai-index'
+  | 'ocr'
+  | 'logs'
+  | 'templates'
+  | 'temporary'
+  | 'cache'
+  | 'backups';
 
 export type EnterpriseFileType =
   | 'Documents'
@@ -32,9 +48,12 @@ export type EnterpriseFileType =
 
 export interface ObjectKeyParams {
   workspaceType?: WorkspaceType;
-  workspaceId?: string;
+  countryCode?: string;
+  businessId?: string;
   tenantId?: string;
   companyId?: string;
+  systemSubfolder?: SystemSubfolder;
+  workspaceId?: string;
   userId?: string;
   originalFileName: string;
   mimeType?: string;
@@ -92,18 +111,15 @@ export class ObjectKeyGenerator {
     if (params.workspaceType) {
       return params.workspaceType.toUpperCase() as WorkspaceType;
     }
-    if (params.tenantId || params.companyId) {
-      return 'BUSINESS';
+    const personalWs = WorkspaceStore.getPersonalWorkspace(params.userId || 'sathiya@memomes.com');
+    if (personalWs && personalWs.workspaceType) {
+      return personalWs.workspaceType.toUpperCase() as WorkspaceType;
     }
     return 'PERSONAL';
   }
 
   static sanitizeStorageId(prefix: 'wrk' | 'usr' | 'fld' | 'obj' | 'thm' | 'prv' | 'shr', existingId?: string): string {
-    if (existingId && 
-        existingId.startsWith(`${prefix}_`) && 
-        !existingId.includes('001') && 
-        !existingId.includes('user001') && 
-        !existingId.includes('workspace001')) {
+    if (existingId && existingId.startsWith(`${prefix}_`)) {
       return existingId.trim();
     }
     return UlidEngine.generate(prefix);
@@ -111,10 +127,16 @@ export class ObjectKeyGenerator {
 
   static generateObjectKey(params: ObjectKeyParams): ObjectKeyResult {
     const type = this.detectWorkspaceType(params);
-    const workspaceId = this.sanitizeStorageId('wrk', params.workspaceId);
-    const userId = this.sanitizeStorageId('usr', params.userId);
-    const tenantId = (params.tenantId || 'tenant001').toLowerCase().trim();
-    const companyId = (params.companyId || 'company001').toLowerCase().trim();
+
+    // Reuse permanent single workspace & user IDs
+    const personalWs = WorkspaceStore.getPersonalWorkspace(params.userId || 'sathiya@memomes.com');
+    const countryCode = (params.countryCode || personalWs.countryCode || 'IN').toUpperCase().trim();
+
+    const rawWorkspaceId = params.workspaceId && params.workspaceId.startsWith('wrk_') ? params.workspaceId : personalWs.workspaceStorageId;
+    const rawUserId = params.userId && params.userId.startsWith('usr_') ? params.userId : personalWs.userStorageId;
+
+    const workspaceId = this.sanitizeStorageId('wrk', rawWorkspaceId);
+    const userId = this.sanitizeStorageId('usr', rawUserId);
     const fileType = this.classifyFileType(params.mimeType, params.originalFileName);
 
     const now = params.date || new Date();
@@ -122,25 +144,47 @@ export class ObjectKeyGenerator {
     const month = String(now.getUTCMonth() + 1).padStart(2, '0');
     const day = String(now.getUTCDate()).padStart(2, '0');
 
+    // ONLY store encrypted object names e.g. obj_xxxxxxxxx.enc (Never original filenames in storage keys!)
     const encryptedObjectId = this.sanitizeStorageId('obj');
     const storageObjectName = `${encryptedObjectId}.enc`;
 
     let objectKey = '';
     let folderPath = '';
-
-    const customFolderPath = params.customFolder ? params.customFolder.replace(/^\/+|\/+$/g, '') + '/' : '';
+    let tenantId = '';
+    let companyId = '';
 
     if (type === 'PERSONAL') {
-      // Personal Format: sathus/memomes/{workspaceId}/{userId}/{fileType}/{YYYY}/{MM}/{DD}/{encryptedObjectId}.enc
-      folderPath = `${PREFIX_BASE}/${workspaceId}/${userId}/${fileType}/${year}/${month}/${day}/${customFolderPath}`;
-      objectKey = `${PREFIX_BASE}/${workspaceId}/${userId}/${fileType}/${year}/${month}/${day}/${storageObjectName}`;
+      // Personal: sathus/memomes/{countryCode}/personal/{workspaceStorageId}/{userStorageId}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
+      folderPath = `${PREFIX_BASE}/${countryCode}/personal/${workspaceId}/${userId}/${fileType}/${year}/${month}/${day}`;
+      objectKey = `${folderPath}/${storageObjectName}`;
+    } else if (type === 'ENTERPRISE') {
+      // Enterprise: sathus/memomes/{countryCode}/enterprise/{tenantId}/{companyId}/{workspaceStorageId}/{userStorageId}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
+      tenantId = (params.tenantId || personalWs.tenantId || 'tenant001').toLowerCase().trim();
+      companyId = (params.companyId || personalWs.companyId || 'company001').toLowerCase().trim();
+      folderPath = `${PREFIX_BASE}/${countryCode}/enterprise/${tenantId}/${companyId}/${workspaceId}/${userId}/${fileType}/${year}/${month}/${day}`;
+      objectKey = `${folderPath}/${storageObjectName}`;
+    } else if (type === 'BUSINESS') {
+      const businessId = (params.businessId || personalWs.businessId || 'biz_01H8XMEMOMES').trim();
+      folderPath = `${PREFIX_BASE}/${countryCode}/business/${businessId}/${workspaceId}/${userId}/${fileType}/${year}/${month}/${day}`;
+      objectKey = `${folderPath}/${storageObjectName}`;
     } else {
-      // Business/Enterprise Format: sathus/memomes/{workspaceId}/{tenantId}/{companyId}/{userId}/{fileType}/{YYYY}/{MM}/{DD}/{encryptedObjectId}.enc
-      folderPath = `${PREFIX_BASE}/${workspaceId}/${tenantId}/${companyId}/${userId}/${fileType}/${year}/${month}/${day}/${customFolderPath}`;
-      objectKey = `${PREFIX_BASE}/${workspaceId}/${tenantId}/${companyId}/${userId}/${fileType}/${year}/${month}/${day}/${storageObjectName}`;
+      // System: system/{subfolder}/{category}/{yyyy}/{MM}/{dd}/obj_xxxxxxxxx.enc
+      const systemSubfolder: SystemSubfolder = params.systemSubfolder || 'thumbnails';
+      folderPath = `system/${systemSubfolder}/${fileType}/${year}/${month}/${day}`;
+      objectKey = `${folderPath}/${storageObjectName}`;
     }
 
     const b2FinalUrl = `https://f004.backblazeb2.com/file/${DEFAULT_BUCKET}/${objectKey}`;
+
+    // Storage Path Logging Requirement
+    console.log(`
+====== MEMOMES CLOUD STORAGE PATH GENERATED ======
+Account Type : ${type}
+Country      : ${countryCode}
+Workspace    : ${workspaceId}
+User         : ${userId}
+Generated Path: ${objectKey}
+==================================================`);
 
     return {
       workspaceType: type,

@@ -56,6 +56,10 @@ export interface ShareParams {
   oneTime: boolean;
   pin?: string | null;
   watermark: WatermarkConfig | null;
+  fileName?: string;
+  fileSize?: string | number;
+  mimeType?: string;
+  previewUrl?: string;
 }
 
 export class ShareCrypto {

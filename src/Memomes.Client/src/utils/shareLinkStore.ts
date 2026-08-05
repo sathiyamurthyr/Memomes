@@ -3,6 +3,7 @@ import {
   type PostLimitAction,
   type SecurityNotification
 } from './shareSecurityPolicyService';
+import { SecurityCenterStore } from './securityCenterStore';
 
 export interface ShareAnalyticsEvent {
   id: string;
@@ -302,6 +303,14 @@ export class ShareLinkStore {
 
     record.failedAttempts += 1;
     const remainingAttempts = Math.max(0, maxAttempts - record.failedAttempts);
+
+    // Trigger SecurityCenterStore Engine (12 Security Actions)
+    SecurityCenterStore.recordFailedPasswordAttempt(
+      record.shareCode,
+      record.fileName,
+      record.failedAttempts,
+      record.createdBy || 'sathiya@memomes.com'
+    );
 
     if (record.failedAttempts >= maxAttempts) {
       record.isLockedOut = true;

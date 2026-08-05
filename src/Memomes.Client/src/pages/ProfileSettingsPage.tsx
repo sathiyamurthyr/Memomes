@@ -11,18 +11,22 @@ import {
   Vibrate,
   Sparkles,
   Eye,
-  Sliders
+  Sliders,
+  Terminal
 } from 'lucide-react';
 import { FeedbackEngine, type FeedbackSettings } from '../utils/feedbackEngine';
+import { DevelopmentResetCenter } from '../components/DevelopmentResetCenter';
 
 interface ProfileSettingsPageProps {
   userEmail?: string;
+  onResetComplete?: () => void;
 }
 
 export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
-  userEmail = 'user@memomes.com'
+  userEmail = 'user@memomes.com',
+  onResetComplete
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'sensory' | 'security' | 'storage' | 'plan'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'sensory' | 'security' | 'storage' | 'plan' | 'devtools'>('profile');
   const [feedbackConfig, setFeedbackConfig] = useState<FeedbackSettings>(FeedbackEngine.getSettings());
 
   const handleToggle = (key: keyof FeedbackSettings) => {
@@ -48,7 +52,7 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
         <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
           <User className="w-6 h-6 text-[#F5B700]" /> Account & System Settings
         </h1>
-        <p className="text-xs text-slate-400">Manage your profile, multi-sensory feedback preferences, zero-knowledge keys, and storage plan.</p>
+        <p className="text-xs text-slate-400">Manage your profile, multi-sensory feedback preferences, zero-knowledge keys, storage plan, and developer tools.</p>
       </div>
 
       {/* Tabs */}
@@ -58,7 +62,8 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
           { id: 'sensory', label: 'Multi-Sensory Feedback', icon: Sliders },
           { id: 'security', label: 'Security & Keys', icon: ShieldCheck },
           { id: 'storage', label: 'Storage & Backup', icon: HardDrive },
-          { id: 'plan', label: 'Subscription Plan', icon: Zap }
+          { id: 'plan', label: 'Subscription Plan', icon: Zap },
+          { id: 'devtools', label: 'Developer Tools', icon: Terminal }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -78,6 +83,15 @@ export const ProfileSettingsPage: React.FC<ProfileSettingsPageProps> = ({
           );
         })}
       </div>
+
+      {/* Developer Tools / Development Reset Center Tab */}
+      {activeTab === 'devtools' && (
+        <DevelopmentResetCenter
+          userRole="Platform Administrator"
+          userEmail={userEmail}
+          onResetComplete={onResetComplete}
+        />
+      )}
 
       {/* Sensory Feedback Settings Tab */}
       {activeTab === 'sensory' && (

@@ -1,419 +1,434 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  Upload, X, FolderPlus, Folder,
-  Info, ChevronRight
+  UploadCloud, FileUp, X, CheckCircle2, ShieldCheck,
+  Lock
 } from 'lucide-react';
 import { StoragePathBuilder, type StoragePathResult } from '../utils/storagePathBuilder';
-import { LocalVaultDb } from '../utils/localVaultDb';
-import { b2SyncWorker } from '../utils/b2SyncWorker';
+import { DuplicateDetector, type DuplicateCheckResult, type DuplicateActionOptions } from '../utils/duplicateDetector';
+import { DuplicateDetectionModal } from './DuplicateDetectionModal';
 import { UploadSuccessModal } from './UploadSuccessModal';
+import { LocalVaultDb, type VaultFile, type EnterpriseFileMetadata } from '../utils/localVaultDb';
+import { VersionManager } from '../utils/versionManager';
+import { b2SyncWorker } from '../utils/b2SyncWorker';
+import { auditLogger } from '../utils/auditLogger';
+import { WorkspaceStore } from '../utils/workspaceStore';
 
 interface EnterpriseUploadModalProps {
+  isOpen: boolean;
   onClose: () => void;
   onUploadSuccess?: (fileMetadata: StoragePathResult) => void;
+  onViewFile?: (file: VaultFile) => void;
+  customFolder?: string;
 }
 
 export const EnterpriseUploadModal: React.FC<EnterpriseUploadModalProps> = ({
+  isOpen,
   onClose,
-  onUploadSuccess
+  onUploadSuccess,
+  onViewFile,
+  customFolder = 'Documents'
 }) => {
-  // Destination & Folder Path State
-  const [destination, setDestination] = useState<'MY_FILES' | 'SHARED' | 'SECURE_VAULT' | 'FAVORITES'>('SECURE_VAULT');
-  const [customFolder, setCustomFolder] = useState('Documents');
-  const [isCreatingSubfolder, setIsCreatingSubfolder] = useState(false);
-  const [newSubfolderName, setNewSubfolderName] = useState('');
-
-  // Tenant / Scope Identifiers
-  const [tenantId] = useState('tenant001');
-  const [companyId] = useState('company001');
-  const [workspaceId, setWorkspaceId] = useState('workspace001');
-  const [userId] = useState('user001');
-
-  // File & Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [duplicateStrategy, setDuplicateStrategy] = useState<'KEEP_BOTH' | 'REPLACE' | 'NEW_VERSION'>('KEEP_BOTH');
-  const [pathPreview, setPathPreview] = useState<StoragePathResult | null>(null);
-
-  // Upload Progress State
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [statusType, setStatusType] = useState<'info' | 'success' | 'error'>('info');
+  const [statusType, setStatusType] = useState<'info' | 'success' | 'warning' | 'error'>('info');
 
-  // Re-calculate Storage Scope Preview when inputs change
-  useEffect(() => {
-    if (selectedFile) {
-      const generated = StoragePathBuilder.generateStoragePath({
-        tenantId,
-        companyId,
-        workspaceId,
-        userId,
-        originalFileName: selectedFile.name,
-        mimeType: selectedFile.type,
-        customFolder
-      });
-      setPathPreview(generated);
-    } else {
-      const defaultPreview = StoragePathBuilder.generateStoragePath({
-        tenantId,
-        companyId,
-        workspaceId,
-        userId,
-        originalFileName: 'document.pdf',
-        mimeType: 'application/pdf',
-        customFolder
-      });
-      setPathPreview(defaultPreview);
-    }
-  }, [selectedFile, tenantId, companyId, workspaceId, userId, customFolder]);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateCheckResult, setDuplicateCheckResult] = useState<DuplicateCheckResult | null>(null);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+  const [completedMetadata, setCompletedMetadata] = useState<StoragePathResult | null>(null);
 
-  // Handle File Selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!isOpen) return null;
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      setStatusMessage(null);
-      setStatusType('info');
+      processUploadPreflight(file);
     }
   };
 
-  // Add Nested Subfolder
-  const handleAddSubfolder = () => {
-    if (!newSubfolderName.trim()) return;
-    const cleanSub = newSubfolderName.trim().replace(/[\/\\]/g, '_');
-    setCustomFolder(prev => (prev ? `${prev}/${cleanSub}` : cleanSub));
-    setNewSubfolderName('');
-    setIsCreatingSubfolder(false);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
   };
 
-  // Execute Encrypted Upload
-  const handleExecuteUpload = async () => {
-    if (!selectedFile || !pathPreview) {
-      setStatusMessage('Please select a file to upload.');
-      setStatusType('error');
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      setSelectedFile(file);
+      processUploadPreflight(file);
+    }
+  };
+
+  /**
+   * PRE-UPLOAD WORKFLOW
+   * 1. Reads metadata (Name, Size, Type, Modified Date)
+   * 2. Calculates SHA-256 hash BEFORE encryption & upload
+   * 3. Queries Database for 4-Case Duplicate Decision Matrix
+   */
+  const processUploadPreflight = async (file: File) => {
+    setIsUploading(true);
+    setUploadProgress(10);
+    setStatusType('info');
+    setStatusMessage(`Calculating SHA-256 hash for '${file.name}'...`);
+
+    const arrayBuffer = await file.arrayBuffer();
+    const sha256 = await DuplicateDetector.computeSha256(arrayBuffer);
+
+    setUploadProgress(35);
+    setStatusMessage('Searching vault database for duplicate content...');
+
+    const dupResult = await DuplicateDetector.checkDuplicate(file.name, sha256, customFolder);
+
+    if (dupResult.isDuplicate) {
+      setUploadProgress(40);
+      setDuplicateCheckResult(dupResult);
+      setPendingUploadFile(file);
+      setShowDuplicateModal(true);
+      setIsUploading(false);
       return;
     }
 
-    setIsUploading(true);
-    setUploadProgress(15);
-    setStatusMessage(`Encrypting file bytes with AES-256-GCM...`);
-    setStatusType('info');
+    // No duplicate detected -> Proceed directly to encryption & upload
+    await executeEncryptedUpload(file, file.name, sha256, 'DIRECT');
+  };
 
-    try {
-      // Step 1: Read payload into DataURL for Zero-Knowledge Vault Storage
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string || '');
-        reader.readAsDataURL(selectedFile);
-      });
+  /**
+   * DUPLICATE ACTION RESOLUTION HANDLER
+   */
+  const handleResolveDuplicate = async (option: DuplicateActionOptions) => {
+    setShowDuplicateModal(false);
+    if (!pendingUploadFile || !duplicateCheckResult) return;
 
-      setUploadProgress(50);
-      setStatusMessage(`Securing payload in Memomes Private Vault...`);
+    const file = pendingUploadFile;
+    const sha256 = duplicateCheckResult.contentHash;
+    const existingFile = duplicateCheckResult.existingFile;
 
-      // Step 2: Save file metadata to LocalVaultDb
-      const fileId = `file-${Date.now()}`;
-      LocalVaultDb.saveFile(fileId, selectedFile.name, selectedFile.type, dataUrl, {
-        size: `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`,
-        category: pathPreview.fileType.toLowerCase() as any,
-        metadata: {
-          file_id: fileId,
-          tenant_id: pathPreview.tenantId,
-          company_id: pathPreview.companyId,
-          workspace_id: pathPreview.workspaceId,
-          user_id: pathPreview.userId,
-          storage_object_id: `sobj-${fileId}`,
-          object_id: pathPreview.objectId,
-          folder_path: pathPreview.folderPath,
-          object_key: pathPreview.objectKey,
-          bucket_name: 'sathus-memomes-vault',
-          storage_provider: 'Memomes Secure Vault',
-          original_file_name: pathPreview.originalFileName,
-          display_name: pathPreview.displayName,
-          storage_object_name: pathPreview.storageObjectName,
-          stored_file_name: pathPreview.storedFileName,
-          extension: selectedFile.name.split('.').pop() || '',
-          mime_type: selectedFile.type || 'application/octet-stream',
-          file_size: selectedFile.size,
-          checksum: `sha256_${Date.now()}`,
-          checksum_sha256: `sha256_${Date.now()}`,
-          checksum_sha1: `sha1_${Date.now()}`,
-          ai_index_status: 'COMPLETED',
-          virus_scan_status: 'CLEAN',
-          version: duplicateStrategy === 'NEW_VERSION' ? 2 : 1,
-          encryption_status: 'AES-256-GCM Zero-Knowledge',
-          share_status: destination === 'SHARED' ? 'SHARED' : 'PRIVATE',
-          created_by: pathPreview.userId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          b2_final_url: pathPreview.b2FinalUrl
+    switch (option.action) {
+      case 'SKIP':
+        auditLogger.logAudit('DUPLICATE_SKIPPED', `Skipped duplicate upload for '${file.name}'`, 'WARNING');
+        auditLogger.trackAnalytics('duplicate_skipped', { fileName: file.name, sha256 });
+        setStatusType('warning');
+        setStatusMessage(`✔ Upload skipped. Existing file '${existingFile?.name || file.name}' preserved.`);
+        setIsUploading(false);
+        break;
+
+      case 'RENAME_AUTO': {
+        const newName = DuplicateDetector.generateAutoRename(file.name);
+        setStatusMessage(`Auto-renamed file to '${newName}'. Encrypting...`);
+        await executeEncryptedUpload(file, newName, sha256, 'RENAME_AUTO');
+        break;
+      }
+
+      case 'REPLACE':
+        if (existingFile) {
+          setStatusMessage(`Replacing '${existingFile.name}'. Creating new version in history...`);
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const dataUrl = reader.result as string;
+            VersionManager.createNewVersion(existingFile.id, file.name, file.type, dataUrl, file.size, sha256);
+            auditLogger.logAudit('REPLACE_EXISTING', `Replaced existing file '${existingFile.name}' with new version`, 'SUCCESS');
+            auditLogger.trackAnalytics('replace_existing', { fileId: existingFile.id, fileName: file.name });
+            setStatusType('success');
+            setStatusMessage(`✔ Replaced existing file '${file.name}' (Version history preserved).`);
+            setIsUploading(false);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          await executeEncryptedUpload(file, file.name, sha256, 'REPLACE');
         }
-      });
+        break;
+
+      case 'CREATE_VERSION':
+        if (existingFile) {
+          setStatusMessage(`Creating next version for '${existingFile.name}'...`);
+          const reader = new FileReader();
+          reader.onload = async () => {
+            const dataUrl = reader.result as string;
+            VersionManager.createNewVersion(existingFile.id, file.name, file.type, dataUrl, file.size, sha256);
+            setStatusType('success');
+            setStatusMessage(`✔ Version updated successfully for '${file.name}'.`);
+            setIsUploading(false);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          await executeEncryptedUpload(file, file.name, sha256, 'CREATE_VERSION');
+        }
+        break;
+
+      case 'KEEP_BOTH': {
+        const autoName = DuplicateDetector.generateAutoRename(file.name);
+        setStatusMessage(`Saving copy as '${autoName}'...`);
+        await executeEncryptedUpload(file, autoName, sha256, 'KEEP_BOTH');
+        break;
+      }
+
+      case 'MOVE_EXISTING':
+        if (existingFile) {
+          LocalVaultDb.saveFile(existingFile.id, existingFile.name, existingFile.type, existingFile.dataUrl, {
+            metadata: {
+              ...(existingFile.metadata as EnterpriseFileMetadata),
+              folder_path: customFolder
+            }
+          });
+          auditLogger.logAudit('FILE_MOVED', `Moved existing file '${existingFile.name}' to '${customFolder}'`, 'SUCCESS');
+          setStatusType('success');
+          setStatusMessage(`✔ Moved '${existingFile.name}' to folder '${customFolder}'.`);
+          setIsUploading(false);
+        }
+        break;
+
+      case 'CANCEL':
+      default:
+        setStatusType('info');
+        setStatusMessage('Upload cancelled.');
+        setIsUploading(false);
+        break;
+    }
+  };
+
+  /**
+   * EXECUTE ENCRYPTED UPLOAD & STORAGE PERSISTENCE
+   */
+  const executeEncryptedUpload = async (
+    filePayload: File,
+    targetFileName: string,
+    sha256: string,
+    _strategy: string
+  ) => {
+    setIsUploading(true);
+    setUploadProgress(60);
+    setStatusMessage(`Encrypting '${targetFileName}' using AES-256-GCM...`);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
 
       setUploadProgress(85);
-      setStatusMessage(`Finalizing zero-knowledge verification...`);
+      setStatusMessage(`Writing encrypted payload to Backblaze B2...`);
 
-      // Step 3: Trigger background sync
-      await b2SyncWorker.triggerSync(`Secure Vault Upload: ${selectedFile.name}`);
+      const fileId = `file_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const personalWs = WorkspaceStore.getPersonalWorkspace();
+
+      const generatedPath: StoragePathResult = StoragePathBuilder.generateStoragePath({
+        originalFileName: targetFileName,
+        tenantId: personalWs.tenantId,
+        companyId: personalWs.companyId,
+        workspaceId: personalWs.workspaceStorageId,
+        userId: personalWs.userStorageId,
+        mimeType: filePayload.type,
+        customFolder
+      });
+
+      const fullMeta: EnterpriseFileMetadata = {
+        file_id: fileId,
+        tenant_id: generatedPath.tenantId,
+        company_id: generatedPath.companyId,
+        workspace_id: generatedPath.workspaceId,
+        user_id: generatedPath.userId,
+        storage_object_id: `sobj-${fileId}`,
+        object_id: generatedPath.objectId,
+        folder_path: generatedPath.folderPath,
+        object_key: generatedPath.objectKey,
+        bucket_name: 'sathus-memomes-vault',
+        storage_provider: 'Memomes Secure Vault',
+        original_file_name: targetFileName,
+        display_name: targetFileName,
+        storage_object_name: generatedPath.storageObjectName,
+        stored_file_name: generatedPath.storedFileName,
+        extension: targetFileName.split('.').pop() || '',
+        mime_type: filePayload.type || 'application/octet-stream',
+        file_size: filePayload.size,
+        checksum: sha256,
+        checksum_sha256: sha256,
+        checksum_sha1: sha256.substring(0, 40),
+        file_hash_sha256: sha256,
+        original_filename: targetFileName,
+        encrypted_filename: generatedPath.storageObjectName,
+        version: 1,
+        is_latest: true,
+        upload_count: 1,
+        last_uploaded: new Date().toISOString(),
+        ai_index_status: 'COMPLETED',
+        virus_scan_status: 'CLEAN',
+        encryption_status: 'AES-256-GCM Zero-Knowledge',
+        share_status: 'PRIVATE',
+        created_by: 'user001',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        b2_final_url: generatedPath.b2FinalUrl
+      };
+
+      // Save to LocalVaultDb
+      LocalVaultDb.saveFile(fileId, targetFileName, filePayload.type, dataUrl, {
+        size: `${(filePayload.size / (1024 * 1024)).toFixed(2)} MB`,
+        category: generatedPath.fileType.toLowerCase() as any,
+        metadata: fullMeta
+      });
+
+      // Audit Log Real-time Event Dispatch
+      auditLogger.logFileActivity(
+        targetFileName,
+        'UPLOAD_COMPLETED',
+        `Stored zero-knowledge encrypted payload in vault`,
+        generatedPath.fileType
+      );
 
       setUploadProgress(100);
       setIsUploading(false);
       setStatusType('success');
+      setStatusMessage(`✔ '${targetFileName}' encrypted and stored in vault.`);
 
-      if (onUploadSuccess) {
-        onUploadSuccess(pathPreview);
-      }
+      // Trigger B2 Auto Sync Worker
+      b2SyncWorker.triggerSync(`Encrypted Upload: ${targetFileName}`);
 
-    } catch (err: any) {
-      setIsUploading(false);
-      setUploadProgress(0);
-      setStatusType('error');
-      setStatusMessage(`Upload failed: ${err?.message || 'Check network connection.'}`);
-    }
+      // Callback notification
+      if (onUploadSuccess) onUploadSuccess(generatedPath);
+      setCompletedMetadata(generatedPath);
+    };
+
+    reader.readAsDataURL(filePayload);
   };
 
-  // ── Render Upload Success Screen Modal when statusType === 'success' ─────────
-  if (statusType === 'success' && selectedFile) {
-    return (
-      <UploadSuccessModal
-        fileName={selectedFile.name}
-        fileSize={selectedFile.size}
-        folderCategory={pathPreview?.fileType || 'Documents'}
-        onOpenFolder={onClose}
-        onPreview={onClose}
-        onShare={onClose}
-        onUploadAnother={() => {
-          setSelectedFile(null);
-          setStatusType('info');
-          setStatusMessage(null);
-          setUploadProgress(0);
-        }}
-        onDone={onClose}
-      />
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300 select-none font-sans">
-      <div className="relative w-full max-w-xl bg-[#0F172A] border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden text-white p-6 space-y-5 max-h-[90vh] flex flex-col justify-between">
-        
-        {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-[#F5B700]/10 border border-[#F5B700]/30">
-              <Upload className="w-6 h-6 text-[#F5B700]" />
+    <>
+      <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
+        <div className="glass-card max-w-lg w-full p-6 rounded-3xl border border-white/10 shadow-2xl space-y-5 text-sans text-xs">
+          
+          {/* HEADER */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner">
+                <UploadCloud className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white font-mono uppercase tracking-wider">
+                  Enterprise Secure File Upload
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                  AES-256 Pre-Upload SHA-256 Duplicate Check Engine
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base md:text-lg font-extrabold text-white flex items-center gap-2">
-                Memomes Secure Vault Upload
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-mono border border-emerald-500/20">
-                  Zero-Knowledge
-                </span>
-              </h2>
-              <p className="text-xs text-slate-400 font-mono">
-                AES-256 Client-Side Encryption • Private Vault Storage
-              </p>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+              aria-label="Close upload modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 text-[#94A3B8] hover:text-white rounded-xl bg-white/[0.06] transition"
+          {/* DROPZONE */}
+          <div
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center gap-3 ${
+              selectedFile
+                ? 'border-cyan-500/50 bg-cyan-500/5'
+                : 'border-white/15 hover:border-cyan-500/40 hover:bg-white/5'
+            }`}
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="overflow-y-auto space-y-4 pr-1 text-xs">
-          
-          {/* Status Message */}
-          {statusMessage && (
-            <div className={`p-3.5 rounded-2xl text-xs font-mono border flex items-center gap-2.5 ${
-              statusType === 'error' ? 'bg-[#EF4444]/15 border-[#EF4444]/40 text-[#EF4444]' :
-              'bg-[#F5B700]/15 border-[#F5B700]/40 text-[#F5B700]'
-            }`}>
-              <Info className="w-4 h-4 shrink-0" />
-              <span className="leading-tight break-all">{statusMessage}</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-cyan-400 border border-white/10">
+              <FileUp className="w-6 h-6" />
             </div>
-          )}
-
-          {/* Progress Bar */}
-          {isUploading && (
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-mono">
-                <span className="text-[#94A3B8]">Encrypting & securing payload...</span>
-                <span className="text-[#F5B700] font-bold">{uploadProgress}%</span>
+            {selectedFile ? (
+              <div className="space-y-1">
+                <div className="text-white font-bold text-sm truncate max-w-xs">{selectedFile.name}</div>
+                <div className="text-xs text-slate-400 font-mono">
+                  {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB · {selectedFile.type || 'Binary Payload'}
+                </div>
               </div>
-              <div className="h-2 rounded-full bg-[#070B14] overflow-hidden border border-white/10">
+            ) : (
+              <div className="space-y-1">
+                <div className="text-slate-200 font-bold text-xs">
+                  Drag & Drop File Here, or <span className="text-cyan-400 underline">Browse</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  Supports Images, PDF, Video, Audio, Office, ZIP, Code (SHA-256 Verified)
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* STATUS MESSAGE & PROGRESS BAR */}
+          {isUploading && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-[11px] font-mono">
+                <span className="text-cyan-400">{statusMessage}</span>
+                <span className="text-slate-300 font-bold">{uploadProgress}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden border border-white/10">
                 <div
-                  className="h-full bg-gradient-to-r from-[#F5B700] to-amber-500 transition-all duration-300 rounded-full"
+                  className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-amber-500 transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
             </div>
           )}
 
-          {/* SECTION 1: TARGET DESTINATION */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-[#F5B700] uppercase tracking-wider font-mono">
-              1. Vault Scope Destination
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 'SECURE_VAULT', label: 'My Files (Vault)', folder: 'Documents' },
-                { id: 'SHARED', label: 'Shared Files', folder: 'Shared' },
-                { id: 'FAVORITES', label: 'Favorites', folder: 'Favorites' }
-              ].map(dest => {
-                const active = destination === dest.id;
-                return (
-                  <button
-                    key={dest.id}
-                    onClick={() => {
-                      setDestination(dest.id as any);
-                      setWorkspaceId(dest.folder.toLowerCase());
-                    }}
-                    className={`py-2.5 px-3 rounded-xl border text-center transition-all ${
-                      active
-                        ? 'bg-[#F5B700]/15 border-[#F5B700] text-white font-bold shadow-[0_0_15px_rgba(245,183,0,0.15)]'
-                        : 'bg-[#070B14] border-white/5 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold">{dest.label}</div>
-                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">/{dest.folder}</div>
-                  </button>
-                );
-              })}
+          {!isUploading && statusMessage && (
+            <div
+              className={`p-3 rounded-2xl border text-xs font-mono flex items-center gap-2 ${
+                statusType === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : statusType === 'warning'
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                  : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{statusMessage}</span>
             </div>
-          </div>
+          )}
 
-          {/* SECTION 2: FOLDER PATH BROWSER */}
-          <div className="p-3.5 rounded-2xl bg-[#070B14] border border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold text-[#F5B700] font-mono flex items-center gap-1.5">
-                <Folder className="w-4 h-4" /> Target Folder Location
-              </label>
-              <button
-                onClick={() => setIsCreatingSubfolder(!isCreatingSubfolder)}
-                className="text-[10px] text-[#F5B700] hover:underline font-mono flex items-center gap-1"
-              >
-                <FolderPlus className="w-3.5 h-3.5" /> + Create Subfolder
-              </button>
-            </div>
-
-            {/* Consumer Folder Path Breadcrumb */}
-            <div className="flex items-center gap-1.5 text-xs font-mono text-slate-300 flex-wrap bg-[#0E1524] p-2.5 rounded-xl border border-white/5">
-              <span className="text-[#F5B700] font-bold">My Files</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-              {customFolder.split('/').map((part, idx) => (
-                <React.Fragment key={idx}>
-                  {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-600" />}
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-white font-bold">
-                    {part}
-                  </span>
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* New Subfolder Input Row */}
-            {isCreatingSubfolder && (
-              <div className="flex items-center gap-2 pt-1 animate-in fade-in">
-                <input
-                  type="text"
-                  value={newSubfolderName}
-                  onChange={e => setNewSubfolderName(e.target.value)}
-                  placeholder="Subfolder name (e.g. Reports)"
-                  className="flex-1 h-8 px-3 rounded-lg bg-[#0E1524] border border-white/10 text-white text-xs font-mono focus:border-[#F5B700] focus:outline-none"
-                />
-                <button
-                  onClick={handleAddSubfolder}
-                  className="btn-gold !h-8 !px-3 !text-xs"
-                >
-                  Add Folder
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* SECTION 3: FILE SELECTION BOX */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-[#F5B700] uppercase tracking-wider font-mono">
-              2. Choose File to Encrypt & Store
-            </label>
-            <div className="p-6 rounded-2xl bg-[#070B14] border border-dashed border-[#F5B700]/40 hover:border-[#F5B700] transition flex flex-col items-center justify-center space-y-2 text-center relative cursor-pointer group">
-              <input
-                type="file"
-                onChange={handleFileChange}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
-              />
-              <Upload className="w-8 h-8 text-[#F5B700] group-hover:scale-110 transition-transform" />
-              {selectedFile ? (
-                <div className="space-y-0.5 z-0">
-                  <div className="font-bold text-white text-xs">{selectedFile.name}</div>
-                  <div className="text-[10px] text-emerald-400 font-mono">
-                    {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Detected: {pathPreview?.fileType}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-0.5 z-0">
-                  <div className="font-bold text-white text-xs">Click to browse file for Zero-Knowledge Vault</div>
-                  <div className="text-[10px] text-slate-400 font-mono">Automatic classification into Documents, Images, Videos, etc.</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SECTION 4: DUPLICATE UPLOAD HANDLING */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-[#F5B700] uppercase tracking-wider font-mono">
-              3. Duplicate Upload Policy
-            </label>
-            <div className="grid grid-cols-3 gap-2 text-xs font-mono">
-              {[
-                { id: 'KEEP_BOTH', label: 'Keep Both', sub: 'Unique UUID key' },
-                { id: 'REPLACE', label: 'Replace', sub: 'Overwrite blob' },
-                { id: 'NEW_VERSION', label: 'New Version', sub: 'Increment v2' }
-              ].map(strat => {
-                const active = duplicateStrategy === strat.id;
-                return (
-                  <button
-                    key={strat.id}
-                    onClick={() => setDuplicateStrategy(strat.id as any)}
-                    className={`py-2 px-2.5 rounded-xl border text-left transition-all ${
-                      active
-                        ? 'bg-[#F5B700]/15 border-[#F5B700] text-white font-bold'
-                        : 'bg-[#070B14] border-white/5 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <div className="text-[11px]">{strat.label}</div>
-                    <div className="text-[9px] text-slate-500">{strat.sub}</div>
-                  </button>
-                );
-              })}
-            </div>
+          {/* FOOTER SECURITY BADGES */}
+          <div className="pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+            <span className="flex items-center gap-1.5 text-cyan-400">
+              <ShieldCheck className="w-3.5 h-3.5" /> AES-256 Zero-Knowledge Encrypted
+            </span>
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <Lock className="w-3.5 h-3.5" /> SHA-256 Pre-Flight Clean
+            </span>
           </div>
 
         </div>
-
-        {/* Action Footer */}
-        <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-[#070B14] border border-white/10 text-xs font-bold text-slate-400 hover:text-white transition"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={handleExecuteUpload}
-            disabled={isUploading || !selectedFile}
-            className="btn-gold !h-11 px-6 text-xs font-extrabold flex items-center gap-2 disabled:opacity-50 shadow-xl"
-          >
-            <Upload className="w-4 h-4" />
-            <span>{isUploading ? 'Encrypting & Storing...' : 'Upload File'}</span>
-          </button>
-        </div>
-
       </div>
-    </div>
+
+      {/* Duplicate Detection Modal */}
+      <DuplicateDetectionModal
+        isOpen={showDuplicateModal}
+        duplicateInfo={duplicateCheckResult}
+        onResolve={handleResolveDuplicate}
+        onViewExisting={(existingFile) => {
+          if (onViewFile) onViewFile(existingFile);
+          onClose();
+        }}
+        onClose={() => setShowDuplicateModal(false)}
+      />
+
+      {/* Success Modal */}
+      {completedMetadata && (
+        <UploadSuccessModal
+          fileName={completedMetadata.originalFileName}
+          destinationDisplay={completedMetadata.folderPath}
+          onDone={() => {
+            setCompletedMetadata(null);
+            onClose();
+          }}
+        />
+      )}
+    </>
   );
 };

@@ -103,17 +103,23 @@ export const MyFilesPage: React.FC<MyFilesPageProps> = ({
     if (typeFilter === 'archives') return (f.contentTypeEncrypted || '').includes('zip');
 
     if (searchQuery.trim()) {
-      return f.fileNameEncrypted.toLowerCase().includes(searchQuery.toLowerCase());
+      const q = searchQuery.toLowerCase().trim();
+      const targetName = (f.name || f.fileNameEncrypted || (f as any).originalFileName || '').toLowerCase();
+      const targetExt = (targetName.split('.').pop() || '').toLowerCase();
+      const targetDate = (f.createdAt || '').toLowerCase();
+      return targetName.includes(q) || targetExt.includes(q) || targetDate.includes(q);
     }
     return true;
   });
 
   // Sorting Logic
   const sortedFiles = [...filteredFiles].sort((a, b) => {
+    const nameA = a.name || a.fileNameEncrypted || (a as any).originalFileName || '';
+    const nameB = b.name || b.fileNameEncrypted || (b as any).originalFileName || '';
     if (sortBy === 'newest') return new Date(b.createdAt || Date.now()).getTime() - new Date(a.createdAt || Date.now()).getTime();
     if (sortBy === 'oldest') return new Date(a.createdAt || Date.now()).getTime() - new Date(b.createdAt || Date.now()).getTime();
-    if (sortBy === 'name-asc') return a.fileNameEncrypted.localeCompare(b.fileNameEncrypted);
-    if (sortBy === 'name-desc') return b.fileNameEncrypted.localeCompare(a.fileNameEncrypted);
+    if (sortBy === 'name-asc') return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    if (sortBy === 'name-desc') return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: 'base' });
     if (sortBy === 'largest') return (b.sizeBytes || 0) - (a.sizeBytes || 0);
     if (sortBy === 'smallest') return (a.sizeBytes || 0) - (b.sizeBytes || 0);
     if (sortBy === 'recently-shared') return (b.activeSharesCount || 0) - (a.activeSharesCount || 0);

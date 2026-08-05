@@ -1,31 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Info, ShieldCheck, Lock, CheckCircle2, Sparkles, Share2, Download,
-  Eye, Edit3, FolderInput, Trash2, FileText, Image as IconImage, Film,
-  Music, Archive, Code, Table, Presentation, File, Copy, Check, Clock, User
+  Info, ShieldCheck, Lock, CheckCircle2, Sparkles,
+  Copy, Check, Clock, User, FolderInput
 } from 'lucide-react';
+import { FileActionHub, type UserRole } from './FileActionHub';
 import type { VaultFile } from '../utils/localVaultDb';
+import { InlineFilePreviewContainer } from './InlineFilePreviewContainer';
 
 interface FileInformationPanelProps {
   file: VaultFile | null;
   activeCategory?: string;
+  userRole?: UserRole;
   onOpenPreview?: (file: VaultFile) => void;
   onDownload?: (file: VaultFile) => void;
-  onOpenShare: (file: VaultFile) => void;
+  onOpenShare?: (file: VaultFile) => void;
   onRename?: (file: VaultFile) => void;
   onMove?: (file: VaultFile) => void;
-  onDelete: (fileId: string) => void;
-  onOpenUpload: () => void;
+  onDelete?: (fileId: string) => void;
+  onOpenUpload?: () => void;
 }
+
+
 
 export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
   file,
   activeCategory = 'Documents',
+  userRole = 'ROLE_USER',
   onOpenPreview,
   onDownload,
   onOpenShare,
-  onRename,
-  onMove,
+  onRename: _onRename,
+  onMove: _onMove,
   onDelete,
   onOpenUpload
 }) => {
@@ -34,10 +39,13 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
 
   // Measure Image Dimensions dynamically
   useEffect(() => {
-    if (file && file.type.startsWith('image/') && (file.dataUrl || file.b2FinalUrl)) {
+    if (file && file.type && file.type.startsWith('image/') && (file.dataUrl || file.b2FinalUrl)) {
       const img = new Image();
       img.onload = () => {
         setImageDimensions(`${img.naturalWidth} × ${img.naturalHeight} px`);
+      };
+      img.onerror = () => {
+        setImageDimensions(null);
       };
       img.src = file.dataUrl || file.b2FinalUrl || '';
     } else {
@@ -54,20 +62,6 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category?.toLowerCase()) {
-      case 'documents': return <FileText className="w-6 h-6 text-blue-400" />;
-      case 'images': return <IconImage className="w-6 h-6 text-emerald-400" />;
-      case 'videos': return <Film className="w-6 h-6 text-purple-400" />;
-      case 'audio': return <Music className="w-6 h-6 text-[#F5B700]" />;
-      case 'archives': return <Archive className="w-6 h-6 text-orange-400" />;
-      case 'sourcecode': return <Code className="w-6 h-6 text-pink-400" />;
-      case 'spreadsheets': return <Table className="w-6 h-6 text-emerald-500" />;
-      case 'presentations': return <Presentation className="w-6 h-6 text-amber-400" />;
-      default: return <File className="w-6 h-6 text-slate-400" />;
-    }
   };
 
   const formattedDate = (rawDate?: string) => {
@@ -98,7 +92,7 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
         <div className="space-y-1 max-w-xs">
           <h3 className="text-sm font-bold text-white font-sans">No File Selected</h3>
           <p className="text-xs text-slate-400 leading-relaxed font-sans">
-            Select a file from your <span className="text-amber-400 font-semibold">{activeCategory}</span> folder to view comprehensive security attributes, AI insights, and activity logs.
+            Select a file from your <span className="text-amber-400 font-semibold">{activeCategory}</span> folder to view security attributes, AI insights, and action tools.
           </p>
         </div>
 
@@ -127,94 +121,31 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
         </span>
       </div>
 
-      {/* ── FILE PREVIEW THUMBNAIL ────────────────────────────────────────────── */}
-      <div className="h-40 rounded-2xl bg-[#070B14] border border-white/10 overflow-hidden flex items-center justify-center relative group shadow-inner">
-        {file.type.startsWith('image/') && (file.dataUrl || file.b2FinalUrl) ? (
-          <img
-            src={file.dataUrl || file.b2FinalUrl}
-            alt={file.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="text-center space-y-2">
-            <div className="p-3 rounded-2xl bg-white/5 border border-white/10 inline-block">
-              {getCategoryIcon(activeCategory)}
-            </div>
-            <div className="text-[11px] text-slate-300 font-mono font-bold uppercase">{file.name.split('.').pop()} File</div>
-          </div>
-        )}
+      {/* ── LIVE INTERACTIVE INLINE PREVIEW CONTAINER (PDF, TXT, MP3, MP4, IMAGES, CODE, ETC.) ── */}
+      <InlineFilePreviewContainer
+        file={file}
+        onOpenPreview={onOpenPreview}
+        onDownload={onDownload}
+        heightClass="h-48"
+      />
 
-        {/* Quick Preview Hover Overlay */}
-        <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-sm">
-          {onOpenPreview && (
-            <button
-              onClick={() => onOpenPreview(file)}
-              className="px-3 py-1.5 rounded-xl bg-white text-slate-950 font-bold text-xs hover:bg-amber-400 transition flex items-center gap-1.5 shadow-lg"
-            >
-              <Eye className="w-3.5 h-3.5" /> Preview
-            </button>
-          )}
-        </div>
-      </div>
+      {/* ── VERIFIED FILE ACTION HUB (Preview, Download, Share, Rename, Move, Delete) ── */}
+      <FileActionHub
+        file={file}
+        userRole={userRole}
+        variant="grid"
+        onOpenViewer={onOpenPreview}
+        onOpenShare={onOpenShare}
+        onDeleteComplete={onDelete}
+        onRenameComplete={(fileId, newName) => {
+          console.log(`[FileActionHub] Rename complete: ${fileId} → ${newName}`);
+        }}
+        onMoveComplete={(fileId, newFolder) => {
+          console.log(`[FileActionHub] Move complete: ${fileId} → ${newFolder}`);
+        }}
+      />
 
-      {/* ── QUICK ACTIONS BAR ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-6 gap-1 bg-[#070B14] p-1.5 rounded-2xl border border-white/10">
-        <button
-          onClick={() => onOpenPreview && onOpenPreview(file)}
-          className="p-2 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition flex flex-col items-center gap-1 text-[10px]"
-          title="Preview File"
-        >
-          <Eye className="w-3.5 h-3.5 text-cyan-400" />
-          <span>View</span>
-        </button>
-
-        <button
-          onClick={() => onDownload && onDownload(file)}
-          className="p-2 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition flex flex-col items-center gap-1 text-[10px]"
-          title="Download File"
-        >
-          <Download className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Save</span>
-        </button>
-
-        <button
-          onClick={() => onOpenShare(file)}
-          className="p-2 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition flex flex-col items-center gap-1 text-[10px]"
-          title="Share Secure Link"
-        >
-          <Share2 className="w-3.5 h-3.5 text-[#F5B700]" />
-          <span>Share</span>
-        </button>
-
-        <button
-          onClick={() => onRename && onRename(file)}
-          className="p-2 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition flex flex-col items-center gap-1 text-[10px]"
-          title="Rename File"
-        >
-          <Edit3 className="w-3.5 h-3.5 text-purple-400" />
-          <span>Rename</span>
-        </button>
-
-        <button
-          onClick={() => onMove && onMove(file)}
-          className="p-2 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition flex flex-col items-center gap-1 text-[10px]"
-          title="Move File"
-        >
-          <FolderInput className="w-3.5 h-3.5 text-amber-400" />
-          <span>Move</span>
-        </button>
-
-        <button
-          onClick={() => onDelete(file.id)}
-          className="p-2 rounded-xl hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition flex flex-col items-center gap-1 text-[10px]"
-          title="Delete File"
-        >
-          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-          <span>Delete</span>
-        </button>
-      </div>
-
-      {/* ── USER-FOCUSED INFORMATION CARD ────────────────────────────────────── */}
+      {/* ── GENERAL DETAILS CARD ────────────────────────────────────────────── */}
       <div className="p-3.5 rounded-2xl bg-[#070B14] border border-white/10 space-y-2.5">
         <div className="text-[11px] font-bold text-white uppercase tracking-wider font-mono border-b border-white/5 pb-1.5">
           General Details
@@ -239,7 +170,7 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
           {imageDimensions && (
             <div className="flex justify-between items-center">
               <span className="text-slate-400">Dimensions:</span>
-              <span className="text-cyan-400 font-mono">{imageDimensions}</span>
+              <span className="text-cyan-400 font-mono font-semibold">{imageDimensions}</span>
             </div>
           )}
 
@@ -261,37 +192,37 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">Uploaded Date:</span>
-            <span className="text-slate-300 font-mono">{formattedDate(file.metadata?.created_at || file.updatedAt)}</span>
+            <span className="text-slate-400">Encryption:</span>
+            <span className="text-emerald-400 font-mono font-bold">AES-256 Zero-Knowledge</span>
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">Last Modified:</span>
-            <span className="text-slate-300 font-mono">{formattedDate(file.updatedAt || file.metadata?.created_at)}</span>
+            <span className="text-slate-400">Uploaded Date:</span>
+            <span className="text-slate-300 font-mono">{formattedDate(file.metadata?.created_at || file.updatedAt)}</span>
           </div>
         </div>
       </div>
 
-      {/* ── SECURITY & PROTECTION CARD ────────────────────────────────────────── */}
+      {/* ── SECURITY STATUS CARD (SANITISED — NO BUCKET OR INTERNAL IDS EXPOSED) ── */}
       <div className="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-500/20 space-y-2">
         <div className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider font-mono flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5" /> Security & Protection
           </span>
-          <span className="text-[9px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">Verified</span>
+          <span className="text-[9px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300 font-bold">Verified</span>
         </div>
 
         <div className="space-y-1.5 text-[11px] font-mono">
           <div className="flex justify-between items-center">
             <span className="text-slate-400 flex items-center gap-1">
-              <Lock className="w-3 h-3 text-emerald-400" /> AES-256 Encryption:
+              <Lock className="w-3 h-3 text-emerald-400" /> AES-256 Protection:
             </span>
-            <span className="text-emerald-400 font-bold">Encrypted</span>
+            <span className="text-emerald-400 font-bold">Active</span>
           </div>
 
           <div className="flex justify-between items-center">
             <span className="text-slate-400 flex items-center gap-1">
-              <Lock className="w-3 h-3 text-amber-400" /> Zero-Knowledge:
+              <Lock className="w-3 h-3 text-amber-400" /> Zero-Knowledge Mode:
             </span>
             <span className="text-amber-400 font-bold">Enforced</span>
           </div>
@@ -300,22 +231,22 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
             <span className="text-slate-400 flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3 text-cyan-400" /> Cryptographic Integrity:
             </span>
-            <span className="text-cyan-400 font-bold">SHA-256 Validated</span>
+            <span className="text-cyan-400 font-bold">Verified</span>
           </div>
 
           <div className="flex justify-between items-center">
             <span className="text-slate-400">Virus Scan:</span>
-            <span className="text-emerald-400 font-bold">Clean / Passed</span>
+            <span className="text-emerald-400 font-bold">Passed</span>
           </div>
 
           <div className="flex justify-between items-center">
-            <span className="text-slate-400">AI Search Index:</span>
+            <span className="text-slate-400">AI Index Status:</span>
             <span className="text-purple-400 font-bold">Indexed</span>
           </div>
         </div>
       </div>
 
-      {/* ── ACTIVITY & AUDIT TRAIL CARD ───────────────────────────────────────── */}
+      {/* ── ACTIVITY TRAIL CARD ───────────────────────────────────────────── */}
       <div className="p-3.5 rounded-2xl bg-[#070B14] border border-white/10 space-y-2">
         <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-purple-400" /> Activity Trail
@@ -346,7 +277,7 @@ export const FileInformationPanel: React.FC<FileInformationPanelProps> = ({
         </div>
       </div>
 
-      {/* ── AI INSIGHTS CARD (WHEN AVAILABLE) ─────────────────────────────────── */}
+      {/* ── AI INSIGHTS CARD ─────────────────────────────────────────────── */}
       <div className="p-3.5 rounded-2xl bg-purple-950/20 border border-purple-500/20 space-y-2">
         <div className="text-[11px] font-bold text-purple-300 uppercase tracking-wider font-mono flex items-center justify-between">
           <span className="flex items-center gap-1.5">

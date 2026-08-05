@@ -12,6 +12,7 @@ public static class FilesEndpoints
     public static RouteGroupBuilder MapFilesEndpoints(this RouteGroupBuilder group)
     {
         group.MapPost("/init-upload", InitUploadAsync);
+        group.MapPost("/check-duplicate", CheckDuplicateAsync);
         group.MapPost("/presigned-chunk-url", GetPresignedChunkUrlAsync);
         group.MapPost("/complete-upload", CompleteUploadAsync);
         group.MapGet("/{id:guid}/presigned-download", GetPresignedDownloadUrlAsync);
@@ -57,9 +58,13 @@ public static class FilesEndpoints
         [FromServices] IAuditLoggerService auditLogger,
         [FromServices] IPreviewGeneratorService previewGenerator,
         [FromServices] IObjectKeyGenerator objectKeyGen,
+        [FromServices] IWorkspaceService workspaceService,
         HttpContext context)
     {
         var sw = Stopwatch.StartNew();
+
+        // Retrieve or initialize user's single permanent workspace
+        var workspace = await workspaceService.GetOrCreatePersonalWorkspaceAsync(input.UserId);
 
         // Generate backend cached preview
         var fileId = Guid.NewGuid();
@@ -98,10 +103,10 @@ public static class FilesEndpoints
         }
 
         var keyResult = objectKeyGen.GenerateObjectKey(new ObjectKeyRequest(
-            WorkspaceType: "BUSINESS",
-            WorkspaceId: "workspace001",
-            TenantId: "tenant001",
-            CompanyId: "company001",
+            WorkspaceType: workspace.WorkspaceType,
+            WorkspaceId: workspace.WorkspaceStorageId,
+            TenantId: workspace.TenantId,
+            CompanyId: workspace.CompanyId,
             UserId: input.UserId,
             OriginalFileName: input.FileNameEncrypted,
             ContentType: input.ContentTypeEncrypted
@@ -125,9 +130,9 @@ public static class FilesEndpoints
         var fileMeta = new FileMetadata
         {
             FileId = fileId,
-            TenantId = "tenant001",
-            CompanyId = "company001",
-            WorkspaceId = "workspace001",
+            TenantId = workspace.TenantId,
+            CompanyId = workspace.CompanyId,
+            WorkspaceId = workspace.WorkspaceStorageId,
             OwnerUserId = input.UserId,
             StorageObjectId = storageObj.StorageObjectId,
             OriginalFileName = input.FileNameEncrypted,
@@ -375,16 +380,69 @@ public static class FilesEndpoints
         });
     }
 
-    private static async Task<IResult> GetDropboxPublicKeyAsync(
-        string token,
-        Guid ownerUserId,
-        AppDbContext db)
+    public record CheckDuplicateRequest(
+        Guid UserId,
+        string FileName,
+        string ContentHash
+    );
+
+    private static async Task<IResult> CheckDuplicateAsync(
+        [FromBody] CheckDuplicateRequest request,
+        [FromServices] AppDbContext db)
     {
-        var keyRecord = await db.UserPublicKeys.FindAsync(ownerUserId);
-        if (keyRecord == null)
+        var existingByHash = await db.StoredFiles
+            .FirstOrDefaultAsync(f => f.UserId == request.UserId && f.ContentHash == request.ContentHash && !f.IsTrash);
+
+        var existingByName = await db.StoredFiles
+            .FirstOrDefaultAsync(f => f.UserId == request.UserId && (f.FileNameEncrypted == request.FileName || f.StoragePath.EndsWith(request.FileName)) && !f.IsTrash);
+
+        if (existingByHash != null && existingByName != null && existingByHash.Id == existingByName.Id)
         {
-            return Results.Ok(new { PublicKeyPem = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuMemomesPublicKey\n-----END PUBLIC KEY-----" });
+            return Results.Ok(new
+            {
+                IsDuplicate = true,
+                DuplicateCase = "CASE_A",
+                Description = "Exact duplicate file (same hash and name) in current workspace.",
+                ExistingFileId = existingByHash.Id,
+                ExistingFileName = existingByHash.FileNameEncrypted,
+                UploadedAt = existingByHash.LastAccessedAt,
+                SizeBytes = existingByHash.SizeBytes
+            });
         }
-        return Results.Ok(new { PublicKeyPem = keyRecord.PublicKeyPem });
+
+        if (existingByName != null && (existingByHash == null || existingByHash.Id != existingByName.Id))
+        {
+            return Results.Ok(new
+            {
+                IsDuplicate = true,
+                DuplicateCase = "CASE_B",
+                Description = "File with same name but different content hash already exists.",
+                ExistingFileId = existingByName.Id,
+                ExistingFileName = existingByName.FileNameEncrypted,
+                UploadedAt = existingByName.LastAccessedAt,
+                SizeBytes = existingByName.SizeBytes
+            });
+        }
+
+        if (existingByHash != null && (existingByName == null || existingByHash.Id != existingByName.Id))
+        {
+            return Results.Ok(new
+            {
+                IsDuplicate = true,
+                DuplicateCase = "CASE_C",
+                Description = "Duplicate file content detected under a different file name.",
+                ExistingFileId = existingByHash.Id,
+                ExistingFileName = existingByHash.FileNameEncrypted,
+                UploadedAt = existingByHash.LastAccessedAt,
+                SizeBytes = existingByHash.SizeBytes
+            });
+        }
+
+        return Results.Ok(new
+        {
+            IsDuplicate = false,
+            DuplicateCase = "NONE",
+            Description = "No duplicate detected."
+        });
     }
 }
