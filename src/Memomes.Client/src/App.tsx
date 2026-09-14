@@ -1,9 +1,13 @@
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, Component, type ErrorInfo, type ReactNode } from 'react';
 import { AuthScreen } from './components/AuthScreen';
 import { DashboardV2 } from './components/DashboardV2';
 import { SecureShareViewerPage } from './pages/SecureShareViewerPage';
+import { PublicDropboxUploadPage } from './pages/PublicDropboxUploadPage';
 import { LandingPage } from './pages/LandingPage';
-import { ShieldAlert, RefreshCw, LogIn } from 'lucide-react';
+import { LocalVaultDb } from './utils/localVaultDb';
+import { AntiScreenshotEngine } from './utils/antiScreenshotEngine';
+import { ShieldAlert, RefreshCw, LogIn, Lock, ZapOff } from 'lucide-react';
+import { PinLockScreen } from './components/PinLockScreen';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -72,7 +76,42 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
+// ── Inactivity constants ─────────────────────────────────────────────────────
+const LOCK_TIMEOUT_MS   = 15 * 60 * 1000; // 15 minutes → PIN lock
+const LOGOUT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes → full logout
+
+// Activity events that reset both timers
+const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
+  'mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel',
+];
+
 function AppContent() {
+  // ── Startup IDB Warm-up ──────────────────────────────────────────────────────
+  // Re-populates RAM_DATA_URL_CACHE and VaultBlobStore._blobUrlCache from IndexedDB
+  // so thumbnails & previews are visible immediately after browser close/reopen.
+  useEffect(() => {
+    LocalVaultDb.warmupFromIDB().then((warmedCount) => {
+      if (warmedCount > 0) {
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('vault-updated', { detail: { warmedCount } }));
+      }
+    });
+  }, []);
+
+  // ── Global Anti-Screenshot & Screen Recording Defense ────────────────────────
+  const [isCaptureShieldActive, setIsCaptureShieldActive] = useState<boolean>(false);
+  const [captureShieldReason, setCaptureShieldReason] = useState<string>('');
+
+  useEffect(() => {
+    AntiScreenshotEngine.ensureInitialized();
+    const unsubscribe = AntiScreenshotEngine.subscribe((active, reason) => {
+      setIsCaptureShieldActive(active);
+      if (reason) setCaptureShieldReason(reason);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // ── Auth state ───────────────────────────────────────────────────────────────
   const [currentUser, setCurrentUser] = useState<{ email: string; masterKey?: CryptoKey; shards?: any } | null>(() => {
     const saved = localStorage.getItem('memomes_logged_in_user');
     const isDirectDashboard = window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/app');
@@ -85,29 +124,140 @@ function AppContent() {
     return window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/auth');
   });
 
+  // ── Lock state ───────────────────────────────────────────────────────────────
+  const [isLocked, setIsLocked] = useState(false);
+  const [secondsUntilLogout, setSecondsUntilLogout] = useState(15 * 60);
+
+  const lockTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearAllTimers = () => {
+    if (lockTimerRef.current)   clearTimeout(lockTimerRef.current);
+    if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+    if (countdownRef.current)   clearInterval(countdownRef.current);
+  };
+
+  const handleLogout = useCallback(() => {
+    clearAllTimers();
+    setIsLocked(false);
+    localStorage.removeItem('memomes_logged_in_user');
+    setCurrentUser(null);
+    setShowAuthScreen(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startTimers = useCallback(() => {
+    clearAllTimers();
+    setIsLocked(false);
+    setSecondsUntilLogout(15 * 60);
+
+    // 15 min idle → lock screen
+    lockTimerRef.current = setTimeout(() => {
+      setIsLocked(true);
+      setSecondsUntilLogout(15 * 60);
+      countdownRef.current = setInterval(() => {
+        setSecondsUntilLogout((s) => {
+          if (s <= 1) { clearInterval(countdownRef.current!); return 0; }
+          return s - 1;
+        });
+      }, 1000);
+    }, LOCK_TIMEOUT_MS);
+
+    // 30 min idle → full logout
+    logoutTimerRef.current = setTimeout(() => {
+      clearAllTimers();
+      handleLogout();
+    }, LOGOUT_TIMEOUT_MS);
+  }, [handleLogout]);
+
+  // Reset timers on any user activity (only when logged in & unlocked)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    startTimers();
+
+    const resetTimers = () => { if (!isLocked) startTimers(); };
+    ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, resetTimers, { passive: true }));
+
+    return () => {
+      clearAllTimers();
+      ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, resetTimers));
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleLoginSuccess = (user: { email: string; masterKey?: CryptoKey; shards?: any }) => {
     localStorage.setItem('memomes_logged_in_user', user.email);
     setCurrentUser(user);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('memomes_logged_in_user');
-    setCurrentUser(null);
-    setShowAuthScreen(true);
+  const handleUnlock = () => {
+    startTimers(); // restart full 15+30 min from now
   };
 
   const isShareLink = window.location.pathname.startsWith('/s/');
+  const isDropboxLink = window.location.pathname.startsWith('/drop/') || window.location.pathname.startsWith('/dropbox/');
+  const dropToken = isDropboxLink
+    ? window.location.pathname.replace(/^\/(drop|dropbox)\//, '').split('/')[0]
+    : undefined;
 
   return (
     <div className="min-h-screen bg-[#080C14] selection:bg-[#C0143F] selection:text-white">
-      {isShareLink ? (
+      {isDropboxLink ? (
+        <PublicDropboxUploadPage dropToken={dropToken} />
+      ) : isShareLink ? (
         <SecureShareViewerPage />
       ) : currentUser ? (
-        <DashboardV2 userEmail={currentUser.email} onLogout={handleLogout} />
+        <>
+          <DashboardV2 userEmail={currentUser.email} onLogout={handleLogout} />
+          {isLocked && (
+            <PinLockScreen
+              userEmail={currentUser.email}
+              secondsUntilLogout={secondsUntilLogout}
+              onUnlock={handleUnlock}
+              onLogout={handleLogout}
+            />
+          )}
+        </>
       ) : showAuthScreen ? (
         <AuthScreen onLoginSuccess={handleLoginSuccess} />
       ) : (
         <LandingPage onOpenAuth={() => setShowAuthScreen(true)} />
+      )}
+
+      {/* ── Global Anti-Screenshot & Screen Recording Defense Overlay ── */}
+      {isCaptureShieldActive && (
+        <div
+          className="fixed inset-0 z-[99999999] bg-[#060910] flex flex-col items-center justify-center p-6 text-center select-none"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div className="w-20 h-20 rounded-full bg-red-500/15 border-2 border-red-500/50 flex items-center justify-center text-red-500 shadow-2xl animate-pulse mb-5">
+            <Lock className="w-10 h-10" />
+          </div>
+          <h3 className="text-xl font-bold text-white font-mono uppercase tracking-wider">
+            Screen Capture & Recording Prohibited
+          </h3>
+          <p className="text-xs text-slate-400 font-mono mt-2 max-w-md leading-relaxed">
+            Screenshot shortcuts, screen recording software, and developer tools are blocked by Memomes Zero-Knowledge Policy.
+          </p>
+          {captureShieldReason && (
+            <div className="mt-2 text-[11px] font-mono text-slate-500">
+              Trigger: {captureShieldReason}
+            </div>
+          )}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-xs font-mono text-red-400 font-bold mt-5">
+            <ZapOff className="w-3.5 h-3.5" /> CAPTURE BLOCKED • CLIPBOARD SANITIZED
+          </div>
+          <button
+            type="button"
+            onClick={() => AntiScreenshotEngine.dismissShield()}
+            className="mt-6 px-6 py-2.5 bg-red-500/20 hover:bg-red-500/35 border border-red-500/40 text-white font-mono text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-2"
+          >
+            Click to Resume Viewing
+          </button>
+        </div>
       )}
     </div>
   );
