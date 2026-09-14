@@ -10,6 +10,8 @@ import { MemomesLogo } from './MemomesLogo';
 import { DeviceSecurityEngine, type DeviceFingerprint, type IpGeoEnrichment, type ActiveSessionRecord } from '../utils/deviceSecurityEngine';
 import { ConcurrentSessionConflictModal } from './ConcurrentSessionConflictModal';
 import { DeviceOtpVerificationModal } from './DeviceOtpVerificationModal';
+import { ErrorModal, WarningModal } from './modals';
+import { login, register, isApiOnline } from '../services/authService';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: { email: string; masterKey: CryptoKey; shards: any }) => void;
@@ -43,6 +45,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [pendingFingerprint, setPendingFingerprint] = useState<DeviceFingerprint | null>(null);
   const [pendingIpGeo, setPendingIpGeo] = useState<IpGeoEnrichment | null>(null);
+  const [authErrorModalMessage, setAuthErrorModalMessage] = useState<string | null>(null);
+  const [ssoModalName, setSsoModalName] = useState<string | null>(null);
   const [lockoutError, setLockoutError] = useState<string | null>(null);
 
   const floatingFiles = [
@@ -112,16 +116,44 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
     setAuthStep(0);
 
     try {
-      for (let i = 0; i < authSequenceSteps.length; i++) {
+      // ── Step 1-2: Animate auth sequence ─────────────────────────────────
+      for (let i = 0; i < Math.min(3, authSequenceSteps.length); i++) {
         setAuthStep(i);
-        await new Promise(res => setTimeout(res, 200));
+        await new Promise(res => setTimeout(res, 180));
+      }
+
+      // ── Step 3: Try real API auth first ──────────────────────────────────
+      const apiOnline = await isApiOnline();
+      let userId: string | undefined;
+      let workspaceId: string | undefined;
+
+      if (apiOnline) {
+        const apiResult = isRegister
+          ? await register(email, password)
+          : await login(email, password);
+
+        if (!apiResult.success && apiResult.error !== 'API_OFFLINE') {
+          setAuthErrorModalMessage(apiResult.error ?? 'Authentication failed');
+          setIsAuthenticating(false);
+          return;
+        }
+
+        userId      = apiResult.userId;
+        workspaceId = apiResult.workspaceId;
+      }
+      // If API offline → continue with local crypto-only login (dev mode)
+
+      // ── Step 4-7: Derive master key (ZkCrypto PBKDF2, 100k iterations) ──
+      for (let i = 3; i < authSequenceSteps.length; i++) {
+        setAuthStep(i);
+        await new Promise(res => setTimeout(res, 180));
       }
 
       const masterKey = await ZkCrypto.deriveMasterKey(password, `salt_${email}`);
       const rawHexKey = await ZkCrypto.exportKeyRaw(masterKey);
-      const shards = ShamirSocialRecovery.splitMasterKey(rawHexKey);
+      const shards    = ShamirSocialRecovery.splitMasterKey(rawHexKey);
 
-      // Create Active Session Record
+      // ── Create active session record ──────────────────────────────────────
       DeviceSecurityEngine.createActiveSession(email, fingerprint, ipGeo);
 
       setShowSuccessMorph(true);
@@ -131,7 +163,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
         onLoginSuccess({ email, masterKey, shards });
       }, 1200);
     } catch (err: any) {
-      alert('Authentication error: ' + err.message);
+      setAuthErrorModalMessage('Authentication error: ' + err.message);
       setIsAuthenticating(false);
     }
   };
@@ -156,11 +188,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
     setPendingFingerprint(fingerprint);
     setPendingIpGeo(ipGeo);
 
-    // 3. Check Trusted Device Registry
+    // 3. Check Trusted Device Registry & Trust Status
     const secConfig = DeviceSecurityEngine.getSecurityConfig();
-    const isTrusted = DeviceSecurityEngine.isDeviceTrusted(email, fingerprint.hashedFingerprint);
+    const trustCheck = DeviceSecurityEngine.checkDeviceTrustStatus(email, fingerprint, ipGeo);
 
-    if (!isTrusted && secConfig.requireOtpForNewDevices) {
+    if (trustCheck.requiresOtp && secConfig.requireOtpForNewDevices) {
+      console.info(`[DeviceSecurityEngine] OTP required for ${email}. Reason: ${trustCheck.reason}`);
       DeviceSecurityEngine.initiateOtpChallenge(email, fingerprint, ipGeo);
       setShowOtpModal(true);
       return;
@@ -478,6 +511,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                 <ArrowRight className="w-4 h-4 text-slate-950" />
               </button>
 
+              {/* DPDP Act Statutory Consent Notice */}
+              <p className="text-[10px] font-mono text-slate-400 text-center leading-relaxed px-1">
+                By {isRegister ? 'creating an account' : 'signing in'}, you agree to the{' '}
+                <a 
+                  href="https://memomes.space/terms" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-[#F6C343] hover:underline"
+                >
+                  Terms & Conditions
+                </a>{' '}
+                and acknowledge the{' '}
+                <a 
+                  href="https://memomes.space/privacy" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-[#F6C343] hover:underline"
+                >
+                  Privacy Policy
+                </a>.
+              </p>
+
             </form>
           )}
 
@@ -495,7 +550,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                 ].map(sso => (
                   <button
                     key={sso.name}
-                    onClick={() => alert(`Redirecting to ${sso.name} SSO...`)}
+                    onClick={() => setSsoModalName(sso.name)}
                     className="py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <span className="text-[#F6C343] font-black">{sso.icon}</span>
@@ -577,6 +632,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
             }
             await proceedWithLogin(pendingFingerprint, pendingIpGeo);
           }}
+        />
+      )}
+
+      {authErrorModalMessage && (
+        <ErrorModal
+          isOpen={!!authErrorModalMessage}
+          title="Authentication Error"
+          message={authErrorModalMessage}
+          onClose={() => setAuthErrorModalMessage(null)}
+        />
+      )}
+
+      {ssoModalName && (
+        <WarningModal
+          isOpen={!!ssoModalName}
+          title={`${ssoModalName} Single Sign-On`}
+          message={`Redirecting to ${ssoModalName} Enterprise SAML/OAuth2 Identity Provider...`}
+          confirmText="Proceed to SSO"
+          onConfirm={() => setSsoModalName(null)}
+          onCancel={() => setSsoModalName(null)}
         />
       )}
 

@@ -271,6 +271,15 @@
           <span>•</span>
           <span class="flex items-center gap-1.5"><i data-lucide="shield" class="w-3.5 h-3.5 text-blue-400"></i> 100% Zero-Knowledge</span>
         </div>
+
+        <!-- Statutory DPDP & IT Rules Consent Notice -->
+        <p class="text-[11px] font-mono text-slate-500 text-center mt-3">
+          By joining the early access waitlist, you agree to the MEMOMES CLOUD 
+          <a href="/terms" class="text-slate-400 hover:text-[#F5B700] underline">Terms & Conditions</a> 
+          and acknowledge our 
+          <a href="/privacy" class="text-slate-400 hover:text-[#F5B700] underline">Privacy Policy</a> 
+          governed under Indian DPDP Act, 2023.
+        </p>
       </div>
 
     </section>
@@ -682,34 +691,84 @@
 
 
   <!-- ── FOOTER ──────────────────────────────────────────────────────────────── -->
-  <footer class="border-t border-white/5 bg-[#02050E] py-12 px-4 sm:px-6 lg:px-8 relative z-10">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+  <footer class="border-t border-white/10 bg-[#02050E] pt-16 pb-12 px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="max-w-7xl mx-auto">
       
-      <div class="flex items-center gap-4">
-        <div class="w-12 h-12 rounded-xl bg-white/5 border border-white/10 p-1 flex items-center justify-center overflow-hidden shrink-0">
-          <img src="assets/logo.png" alt="Memomes by Sathus Technology Pvt. Ltd." class="w-full h-full object-contain" />
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="text-base font-bold text-white font-mono">MEMOMES.SPACE</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#F5B700]/10 text-[#F5B700] font-mono border border-[#F5B700]/20">Brand</span>
+      <!-- Top 4-Column Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-white/10">
+        
+        <!-- Column 1: Brand & Entity (2 cols wide on lg) -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-white/5 border border-white/10 p-1 flex items-center justify-center overflow-hidden shrink-0">
+              <img src="assets/logo.png" alt="Memomes by Sathus Technology Pvt. Ltd." class="w-full h-full object-contain" />
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-base font-bold text-white font-mono">MEMOMES CLOUD</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#F5B700]/10 text-[#F5B700] font-mono border border-[#F5B700]/20">Brand</span>
+              </div>
+              <p class="text-xs text-slate-400">By Sathus Technology Pvt. Ltd.</p>
+            </div>
           </div>
-          <p class="text-xs text-slate-400 mt-1">
-            Engineered & operated by <strong class="text-slate-200">Sathus Technology Pvt. Ltd.</strong>
+          <p class="text-xs text-slate-400 leading-relaxed max-w-sm">
+            Sovereign, client-side zero-knowledge encrypted cloud storage. Engineered in India for absolute personal data privacy and digital independence.
           </p>
-          <p class="text-[11px] text-slate-500 mt-0.5">© 2026 Sathus Technology Pvt. Ltd. All rights reserved.</p>
+          <div class="flex items-center gap-3 text-xs font-mono text-emerald-400">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>DPDP Act, 2023 & IT Rules Aligned</span>
+          </div>
         </div>
+
+        <!-- Column 2: Product -->
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold text-white font-mono uppercase tracking-wider">Product</h4>
+          <ul class="space-y-2 text-xs font-mono text-slate-400">
+            <li><a href="#features" class="hover:text-[#F5B700] transition">Features & Bento</a></li>
+            <li><a href="#architecture" class="hover:text-[#F5B700] transition">Zero-Knowledge Flow</a></li>
+            <li><a href="#comparison" class="hover:text-[#F5B700] transition">Architectural Matrix</a></li>
+            <li><a href="#security" class="hover:text-[#F5B700] transition">Security Specs</a></li>
+            <li><a href="#faq" class="hover:text-[#F5B700] transition">FAQ Accordion</a></li>
+            <li><a href="#waitlist" class="hover:text-[#F5B700] transition">Claim 50GB Pass</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 3: Legal (India) -->
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold text-white font-mono uppercase tracking-wider">Legal (India)</h4>
+          <ul class="space-y-2 text-xs font-mono text-slate-400">
+            <li><a href="/privacy" class="hover:text-[#F5B700] transition">Privacy Policy (DPDP)</a></li>
+            <li><a href="/terms" class="hover:text-[#F5B700] transition">Terms & Conditions</a></li>
+            <li><a href="/grievance" class="hover:text-[#F5B700] transition font-bold text-slate-300">Grievance Redressal</a></li>
+            <li><a href="/refund-policy" class="hover:text-[#F5B700] transition">Refund & Cancellation</a></li>
+            <li><a href="/cookie-policy" class="hover:text-[#F5B700] transition">Cookie Policy</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 4: Support & Security -->
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold text-white font-mono uppercase tracking-wider">Support & Security</h4>
+          <ul class="space-y-2 text-xs font-mono text-slate-400">
+            <li><a href="/contact" class="hover:text-[#F5B700] transition">Contact Directory</a></li>
+            <li><a href="/contact#security" class="hover:text-[#F5B700] transition">Report Security Bug</a></li>
+            <li><a href="/contact#billing" class="hover:text-[#F5B700] transition">Billing Inquiries</a></li>
+            <li><a href="/privacy#rights" class="hover:text-[#F5B700] transition">Data Principal Rights</a></li>
+            <li><a href="mailto:support@memomes.space" class="text-[#F5B700] hover:underline">support@memomes.space</a></li>
+          </ul>
+        </div>
+
       </div>
 
-      <div class="flex items-center gap-6 text-xs text-slate-400 font-mono">
-        <span class="flex items-center gap-1.5 text-emerald-400">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          <span>Zero-Knowledge Verified</span>
-        </span>
-        <a href="#waitlist" class="hover:text-[#F5B700] transition">Join Waitlist</a>
-        <a href="#security" class="hover:text-[#F5B700] transition">Security</a>
-        <span class="text-slate-600">|</span>
-        <span class="text-slate-400">Sathus Technology Pvt. Ltd.</span>
+      <!-- Bottom Bar -->
+      <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
+        <div>
+          © 2026 Sathus Technology Pvt. Ltd. All rights reserved. Registered in Chennai, Tamil Nadu, India.
+        </div>
+        <div class="flex items-center gap-4 text-slate-400">
+          <span class="flex items-center gap-1.5"><i data-lucide="shield" class="w-3.5 h-3.5 text-[#F5B700]"></i> Zero-Knowledge Verified</span>
+          <span>•</span>
+          <span>INR (₹) Billing</span>
+        </div>
       </div>
 
     </div>

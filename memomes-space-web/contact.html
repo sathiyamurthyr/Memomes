@@ -1,0 +1,306 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us & Support — MEMOMES CLOUD | Sathus Technology Pvt. Ltd.</title>
+  <meta name="description" content="Contact MEMOMES CLOUD by Sathus Technology Pvt. Ltd. Dedicated contact channels for Customer Support, Privacy Inquiries, Security Vulnerability Disclosures, and Grievance Redressal.">
+  <meta name="author" content="Sathus Technology Pvt. Ltd.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              gold: '#F5B700',
+              'gold-hover': '#E0A800',
+              obsidian: '#030712',
+              card: '#0B0F19',
+              border: '#1E293B',
+              emerald: '#10B981',
+              sapphire: '#3B82F6',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #030712; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #F5B700; }
+    .glass-card {
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .contact-card:hover {
+      border-color: rgba(245, 183, 0, 0.4);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+
+<body class="bg-[#030712] text-slate-100 font-sans selection:bg-[#F5B700] selection:text-slate-950 overflow-x-hidden min-h-screen flex flex-col justify-between">
+
+  <!-- ── NAVIGATION BAR ──────────────────────────────────────────────────────── -->
+  <header class="sticky top-0 z-50 w-full border-b border-white/5 bg-[#030712]/90 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Brand Logo & Company Info -->
+      <a href="/" class="flex items-center gap-3.5 group">
+        <div class="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 p-1 shadow-lg shadow-black/40 group-hover:border-[#F5B700]/50 transition-all duration-300 flex items-center justify-center overflow-hidden shrink-0">
+          <img src="assets/logo.png" alt="Memomes by Sathus Technology Pvt. Ltd." class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-extrabold tracking-tight text-white font-mono">MEMOMES</span>
+            <span class="px-2 py-0.5 text-[10px] font-bold font-mono uppercase rounded-full bg-[#F5B700]/15 text-[#F5B700] border border-[#F5B700]/30">CLOUD</span>
+          </div>
+          <p class="text-[10px] font-mono text-slate-400">By Sathus Technology Pvt. Ltd.</p>
+        </div>
+      </a>
+
+      <!-- Quick Nav Links -->
+      <nav class="hidden md:flex items-center gap-6 text-xs font-mono text-slate-300">
+        <a href="/" class="hover:text-[#F5B700] transition-colors flex items-center gap-1.5"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to Home</a>
+        <a href="/privacy" class="hover:text-[#F5B700] transition-colors">Privacy Policy</a>
+        <a href="/terms" class="hover:text-[#F5B700] transition-colors">Terms & Conditions</a>
+        <a href="/grievance" class="hover:text-[#F5B700] transition-colors">Grievance Redressal</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <a href="/" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-slate-200 transition">
+          Return to App
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── MAIN CONTACT CONTENT ──────────────────────────────────────────────── -->
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-1 w-full">
+    
+    <!-- Title & Intro Header -->
+    <div class="text-center max-w-3xl mx-auto mb-14">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F5B700]/10 border border-[#F5B700]/30 text-[#F5B700] text-xs font-mono font-bold uppercase tracking-wider mb-4">
+        <i data-lucide="headphones" class="w-3.5 h-3.5"></i> Dedicated Channels
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight font-sans mb-4">
+        Contact MEMOMES CLOUD
+      </h1>
+      <p class="text-slate-400 text-sm sm:text-base leading-relaxed">
+        Because MEMOMES CLOUD safeguards personal zero-knowledge encrypted vaults, we maintain specialized, separated departments for Customer Support, Data Protection Requests, Security Incident Reports, and Grievance Redressal.
+      </p>
+    </div>
+
+    <!-- Security Warning Alert -->
+    <div class="mb-12 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3.5">
+      <i data-lucide="shield-alert" class="w-5 h-5 text-[#F5B700] shrink-0 mt-0.5"></i>
+      <div class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+        <strong class="text-[#F5B700]">Crucial Security Warning:</strong> MEMOMES CLOUD and Sathus Technology Pvt. Ltd. representatives will <strong>NEVER</strong> contact you to ask for your vault password, Master Recovery Seed Phrase, OTP, UPI PIN, ATM PIN, CVV, or banking credentials. Never share your secret keys with anyone.
+      </div>
+    </div>
+
+    <!-- Contact Channels Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+      
+      <!-- 1. General Support -->
+      <div class="glass-card contact-card p-6 rounded-2xl transition-all duration-200">
+        <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-4">
+          <i data-lucide="life-buoy" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">General Support</h3>
+        <p class="text-xs text-slate-400 mb-4">Account assistance, login, file uploads, chunked sync, and client playback.</p>
+        <div class="font-mono text-xs text-slate-300 mb-3 space-y-1">
+          <div><strong>Hours:</strong> Mon – Sat, 9 AM – 8 PM IST</div>
+          <div><strong>Turnaround:</strong> Within 12–24 Hours</div>
+        </div>
+        <a href="mailto:support@memomes.space" class="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#F5B700] hover:text-[#E0A800] transition">
+          <span>support@memomes.space</span>
+          <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+
+      <!-- 2. Privacy & Data Requests -->
+      <div class="glass-card contact-card p-6 rounded-2xl transition-all duration-200">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
+          <i data-lucide="lock" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">Privacy & Data Requests</h3>
+        <p class="text-xs text-slate-400 mb-4">DPDP Act 2023 rights, account deletion, consent withdrawal, and data fiduciary queries.</p>
+        <div class="font-mono text-xs text-slate-300 mb-3 space-y-1">
+          <div><strong>Department:</strong> Data Protection Office</div>
+          <div><strong>Authority:</strong> DPDP Act 2023 Compliance</div>
+        </div>
+        <a href="mailto:privacy@memomes.space" class="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#F5B700] hover:text-[#E0A800] transition">
+          <span>privacy@memomes.space</span>
+          <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+
+      <!-- 3. Grievance Redressal -->
+      <div class="glass-card contact-card p-6 rounded-2xl transition-all duration-200 border-emerald-500/30">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[#F5B700] flex items-center justify-center mb-4">
+          <i data-lucide="scale" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">Grievance Redressal</h3>
+        <p class="text-xs text-slate-400 mb-4">Statutory officer under Rule 3(2) IT Rules 2021 & Section 13 DPDP Act 2023.</p>
+        <div class="font-mono text-xs text-slate-300 mb-3 space-y-1">
+          <div><strong>Officer:</strong> R. Sathiyamurthy</div>
+          <div><strong>Resolution:</strong> Within 15 Days</div>
+        </div>
+        <a href="/grievance" class="inline-flex items-center gap-2 text-xs font-mono font-bold text-emerald-400 hover:text-emerald-300 transition">
+          <span>grievance@memomes.space</span>
+          <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+
+      <!-- 4. Security Incident Reporting -->
+      <div class="glass-card contact-card p-6 rounded-2xl transition-all duration-200">
+        <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mb-4">
+          <i data-lucide="shield-check" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">Security Vulnerability Disclosures</h3>
+        <p class="text-xs text-slate-400 mb-4">Bug bounty inquiries, vulnerability disclosures, and incident notifications.</p>
+        <div class="font-mono text-xs text-slate-300 mb-3 space-y-1">
+          <div><strong>Department:</strong> AppSec & Cryptography</div>
+          <div><strong>Response:</strong> P1 Triage within 4 Hours</div>
+        </div>
+        <a href="mailto:security@memomes.space" class="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#F5B700] hover:text-[#E0A800] transition">
+          <span>security@memomes.space</span>
+          <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+
+      <!-- 5. Legal & Copyright (IP) -->
+      <div class="glass-card contact-card p-6 rounded-2xl transition-all duration-200">
+        <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-4">
+          <i data-lucide="file-text" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">Copyright & Legal Notices</h3>
+        <p class="text-xs text-slate-400 mb-4">Intellectual property infringement notices, court orders, and law enforcement requests.</p>
+        <div class="font-mono text-xs text-slate-300 mb-3 space-y-1">
+          <div><strong>Department:</strong> Legal & Regulatory</div>
+          <div><strong>Jurisdiction:</strong> Courts of Chennai, India</div>
+        </div>
+        <a href="mailto:legal@memomes.space" class="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#F5B700] hover:text-[#E0A800] transition">
+          <span>legal@memomes.space</span>
+          <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+
+      <!-- 6. Billing & Payments -->
+      <div class="glass-card contact-card p-6 rounded-2xl transition-all duration-200">
+        <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mb-4">
+          <i data-lucide="credit-card" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">Billing & Invoicing</h3>
+        <p class="text-xs text-slate-400 mb-4">GST invoices, UPI AutoPay inquiries, plan upgrades, and refund requests.</p>
+        <div class="font-mono text-xs text-slate-300 mb-3 space-y-1">
+          <div><strong>Currency:</strong> Indian Rupees (INR ₹)</div>
+          <div><strong>GST Invoicing:</strong> Standard 18% HSN Code</div>
+        </div>
+        <a href="mailto:billing@memomes.space" class="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#F5B700] hover:text-[#E0A800] transition">
+          <span>billing@memomes.space</span>
+          <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Corporate Headquarters Location Box -->
+    <div class="glass-card p-8 rounded-3xl border border-white/10 mb-12">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+        <div>
+          <span class="text-xs font-mono font-bold uppercase tracking-wider text-[#F5B700]">Registered Indian Entity</span>
+          <h2 class="text-2xl font-bold text-white mt-1 mb-3">Sathus Technology Pvt. Ltd.</h2>
+          <p class="text-sm text-slate-400 leading-relaxed mb-6">
+            Engineering sovereign zero-knowledge cryptographic platforms and high-durability cloud systems for India.
+          </p>
+          <div class="space-y-2 text-xs font-mono text-slate-300">
+            <div class="flex items-start gap-2.5">
+              <i data-lucide="map-pin" class="w-4 h-4 text-[#F5B700] shrink-0 mt-0.5"></i>
+              <span>No. 14, Rajiv Gandhi Salai (OMR), Navalur, Chennai, Tamil Nadu 600130, India</span>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="mail" class="w-4 h-4 text-[#F5B700] shrink-0"></i>
+              <a href="mailto:contact@memomes.space" class="text-white hover:text-[#F5B700] underline">contact@memomes.space</a>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="globe" class="w-4 h-4 text-[#F5B700] shrink-0"></i>
+              <span>https://memomes.space</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-white/5 border border-white/5 space-y-3 font-mono text-xs text-slate-300">
+          <div class="text-[#F5B700] font-bold text-sm">Quick Routing Guide</div>
+          <div>• For account password resets: Use your cryptographic Recovery Phrase. Our servers cannot decrypt or reset passwords without it.</div>
+          <div>• For law enforcement and legal notices: Email <strong class="text-white">legal@memomes.space</strong> with official letterhead and judicial reference.</div>
+          <div>• For statutory disputes: File through <strong class="text-white">grievance@memomes.space</strong> for tracked acknowledgment.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── FOOTER ──────────────────────────────────────────────────────────────── -->
+  <footer class="border-t border-white/5 bg-[#02050E] py-10 px-4 sm:px-6 lg:px-8 relative z-10 mt-16">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+      
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 p-1 flex items-center justify-center overflow-hidden shrink-0">
+          <img src="assets/logo.png" alt="Memomes by Sathus Technology Pvt. Ltd." class="w-full h-full object-contain" />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-white font-mono">MEMOMES CLOUD</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#F5B700]/10 text-[#F5B700] font-mono border border-[#F5B700]/20">Brand</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Engineered & operated by <strong class="text-slate-200">Sathus Technology Pvt. Ltd.</strong>
+          </p>
+          <p class="text-[11px] text-slate-500">© 2026 Sathus Technology Pvt. Ltd. All rights reserved.</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-5 text-xs text-slate-400 font-mono">
+        <a href="/privacy" class="hover:text-[#F5B700] transition">Privacy Policy</a>
+        <a href="/terms" class="hover:text-[#F5B700] transition">Terms</a>
+        <a href="/grievance" class="hover:text-[#F5B700] transition">Grievance</a>
+        <a href="/refund-policy" class="hover:text-[#F5B700] transition">Refunds</a>
+        <a href="/cookie-policy" class="hover:text-[#F5B700] transition">Cookies</a>
+        <a href="/contact" class="text-[#F5B700] font-bold">Contact</a>
+      </div>
+
+    </div>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grievance Redressal Mechanism — MEMOMES CLOUD | Sathus Technology Pvt. Ltd.</title>
+  <meta name="description" content="Statutory Grievance Redressal Mechanism for MEMOMES CLOUD by Sathus Technology Pvt. Ltd. under Rule 3(2) of the Information Technology Rules, 2021 and the DPDP Act, 2023.">
+  <meta name="author" content="Sathus Technology Pvt. Ltd.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              gold: '#F5B700',
+              'gold-hover': '#E0A800',
+              obsidian: '#030712',
+              card: '#0B0F19',
+              border: '#1E293B',
+              emerald: '#10B981',
+              sapphire: '#3B82F6',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #030712; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #F5B700; }
+    .glass-card {
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .legal-content h2 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-top: 2.25rem;
+      margin-bottom: 0.85rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .legal-content p {
+      color: #94A3B8;
+      line-height: 1.75;
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+    .legal-content ul {
+      list-style-type: disc;
+      padding-left: 1.5rem;
+      margin-bottom: 1.25rem;
+      color: #94A3B8;
+    }
+    .legal-content li {
+      margin-bottom: 0.4rem;
+      line-height: 1.6;
+    }
+    .legal-content strong {
+      color: #F1F5F9;
+    }
+  </style>
+</head>
+
+<body class="bg-[#030712] text-slate-100 font-sans selection:bg-[#F5B700] selection:text-slate-950 overflow-x-hidden min-h-screen flex flex-col justify-between">
+
+  <!-- ── NAVIGATION BAR ──────────────────────────────────────────────────────── -->
+  <header class="sticky top-0 z-50 w-full border-b border-white/5 bg-[#030712]/90 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Brand Logo & Company Info -->
+      <a href="/" class="flex items-center gap-3.5 group">
+        <div class="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 p-1 shadow-lg shadow-black/40 group-hover:border-[#F5B700]/50 transition-all duration-300 flex items-center justify-center overflow-hidden shrink-0">
+          <img src="assets/logo.png" alt="Memomes by Sathus Technology Pvt. Ltd." class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-extrabold tracking-tight text-white font-mono">MEMOMES</span>
+            <span class="px-2 py-0.5 text-[10px] font-bold font-mono uppercase rounded-full bg-[#F5B700]/15 text-[#F5B700] border border-[#F5B700]/30">CLOUD</span>
+          </div>
+          <p class="text-[10px] font-mono text-slate-400">By Sathus Technology Pvt. Ltd.</p>
+        </div>
+      </a>
+
+      <!-- Quick Nav Links -->
+      <nav class="hidden md:flex items-center gap-6 text-xs font-mono text-slate-300">
+        <a href="/" class="hover:text-[#F5B700] transition-colors flex items-center gap-1.5"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to Home</a>
+        <a href="/privacy" class="hover:text-[#F5B700] transition-colors">Privacy Policy</a>
+        <a href="/terms" class="hover:text-[#F5B700] transition-colors">Terms & Conditions</a>
+        <a href="/contact" class="hover:text-[#F5B700] transition-colors">Contact</a>
+      </nav>
+
+      <div class="flex items-center gap-3">
+        <a href="/" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-slate-200 transition">
+          Return to App
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── MAIN GRIEVANCE CONTENT ────────────────────────────────────────────── -->
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-1 w-full">
+    
+    <!-- Header -->
+    <div class="mb-10 pb-8 border-b border-white/10">
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <span class="px-3 py-1 rounded-full bg-[#F5B700]/10 border border-[#F5B700]/30 text-[#F5B700] text-xs font-mono font-bold uppercase tracking-wider">
+          Statutory Compliance Notice
+        </span>
+        <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+          Rule 3(2) IT Rules, 2021 & Section 13 DPDP Act, 2023
+        </span>
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight font-sans">
+        Grievance Redressal Mechanism
+      </h1>
+      <p class="text-slate-400 text-sm mt-3 font-mono">
+        Entity: Sathus Technology Pvt. Ltd. | Brand: MEMOMES CLOUD | Jurisdiction: India
+      </p>
+    </div>
+
+    <!-- Grievance Officer Official Profile Card -->
+    <div class="glass-card p-8 rounded-3xl border border-emerald-500/30 mb-12 bg-gradient-to-br from-[#0B0F19] to-[#030712]">
+      <div class="flex items-start gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+          <i data-lucide="scale" class="w-6 h-6"></i>
+        </div>
+        <div class="flex-1">
+          <h2 class="text-xl font-bold text-white mb-1">Designated Statutory Grievance Officer</h2>
+          <p class="text-xs text-slate-400 font-mono mb-6">Appointed pursuant to Rule 3(2) of the Information Technology (Intermediary Guidelines) Rules, 2021</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-mono">
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+              <span class="text-slate-500 block text-[10px] uppercase">Officer Name & Title</span>
+              <div class="text-white font-bold text-sm mt-0.5">R. Sathiyamurthy</div>
+              <div class="text-slate-300 text-xs mt-0.5">Grievance Officer & Data Protection Lead</div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+              <span class="text-slate-500 block text-[10px] uppercase">Direct Grievance Channel</span>
+              <a href="mailto:grievance@memomes.space" class="text-[#F5B700] font-bold text-sm mt-0.5 block hover:underline">
+                grievance@memomes.space
+              </a>
+              <div class="text-slate-400 text-[11px] mt-0.5">Tracked Ticketed Dispatch</div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+              <span class="text-slate-500 block text-[10px] uppercase">Registered Corporate Office</span>
+              <div class="text-white text-xs mt-0.5 leading-relaxed">
+                Sathus Technology Pvt. Ltd.<br />
+                No. 14, Rajiv Gandhi Salai (OMR), Navalur,<br />
+                Chennai, Tamil Nadu 600130, India
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+              <span class="text-slate-500 block text-[10px] uppercase">Statutory Response Windows</span>
+              <div class="text-emerald-400 font-bold text-xs mt-0.5">Acknowledgment: Within 24 Hours</div>
+              <div class="text-emerald-400 font-bold text-xs mt-0.5">Disposal / Resolution: Within 15 Days</div>
+              <div class="text-slate-400 text-[11px] mt-1">Working Hours: Mon–Fri, 09:30 AM – 06:30 PM IST</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grievance Filing Guidelines -->
+    <article class="legal-content">
+
+      <h2>1. Purpose of the Grievance Redressal Mechanism</h2>
+      <p>
+        In strict alignment with the <strong>Information Technology Act, 2000</strong>, the <strong>Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021</strong>, and the <strong>Digital Personal Data Protection Act, 2023</strong>, Sathus Technology Pvt. Ltd. provides this transparent, accessible mechanism for users and affected third parties to report concerns regarding:
+      </p>
+      <ul>
+        <li>Unlawful, infringing, or objectionable content shared via MEMOMES CLOUD links</li>
+        <li>Copyright, trademark, or intellectual property violations</li>
+        <li>Personal data breaches, unauthorized processing, or consent withdrawal disputes</li>
+        <li>Account lockouts, security suspensions, or access denials</li>
+        <li>Billing irregularities or payment processing grievances</li>
+      </ul>
+
+      <h2>2. How to File a Grievance</h2>
+      <p>
+        To ensure prompt investigation, all grievances must be submitted via email to <a href="mailto:grievance@memomes.space" class="text-[#F5B700] underline">grievance@memomes.space</a> containing:
+      </p>
+      <div class="p-5 rounded-2xl bg-white/5 border border-white/10 font-mono text-xs text-slate-300 space-y-2 mb-6">
+        <div><strong>1. Complainant Information:</strong> Full Legal Name, Registered Email, Contact Phone, and Residential/Business Address.</div>
+        <div><strong>2. Exact Details of Grievance:</strong> Specific description of the content, incident, or account dispute.</div>
+        <div><strong>3. Location / Reference:</strong> Exact sharing URL (<code>https://memomes.space/...</code>), transaction ID, or account identifier.</div>
+        <div><strong>4. Supporting Evidence:</strong> Relevant screenshots, proof of copyright ownership, or payment transaction slips.</div>
+        <div><strong>5. Statutory Declaration:</strong> A statement that the information provided is true and accurate to the best of your knowledge.</div>
+      </div>
+
+      <h2>3. Standard Operating Procedure & Timelines</h2>
+      <ul>
+        <li><strong>Step 1 (Receipt & Acknowledgment):</strong> Within <strong>24 hours</strong> of receiving your email at <code>grievance@memomes.space</code>, our system issues a unique Grievance Reference Number and formal acknowledgment.</li>
+        <li><strong>Step 2 (Investigation & Neutral Triage):</strong> The Grievance Officer evaluates the complaint against the Terms of Service, Privacy Policy, and relevant provisions of the IT Rules and DPDP Act.</li>
+        <li><strong>Step 3 (Remediation & Response):</strong> Within <strong>15 days</strong> of receipt, the Grievance Officer will communicate the reasoned resolution, takedown action, or corrective measures undertaken.</li>
+      </ul>
+
+      <h2>4. Grievance Escalation & Appellate Options</h2>
+      <p>
+        If you are dissatisfied with the resolution provided by our Grievance Officer, you have the right to escalate the matter under Indian law:
+      </p>
+      <ul>
+        <li>
+          <strong>Grievance Appellate Committee (GAC):</strong> Under Rule 3A of the IT Rules 2021, you may appeal against the Grievance Officer's decision before the central Grievance Appellate Committee via the official portal (<code>https://gac.gov.in</code>) within thirty (30) days.
+        </li>
+        <li>
+          <strong>Data Protection Board of India:</strong> For unresolved grievances concerning personal data rights under the DPDP Act, 2023, you may approach the Data Protection Board of India as provided under Section 13 and Section 27 of the DPDP Act.
+        </li>
+      </ul>
+
+      <h2>5. Malicious or Frivolous Complaints</h2>
+      <p>
+        Please ensure all complaints are filed in good faith. Filing false, misleading, or vexatious complaints with malicious intent may result in appropriate legal remedies and civil damages under applicable Indian laws.
+      </p>
+
+    </article>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="mt-16 pt-8 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-slate-400">
+      <a href="/" class="hover:text-[#F5B700] transition flex items-center gap-2">
+        <i data-lucide="home" class="w-4 h-4"></i> Return to Homepage
+      </a>
+      <div class="flex items-center gap-4">
+        <a href="/privacy" class="hover:text-[#F5B700] transition">Privacy Policy</a>
+        <span>•</span>
+        <a href="/terms" class="hover:text-[#F5B700] transition">Terms & Conditions</a>
+        <span>•</span>
+        <a href="/contact" class="hover:text-[#F5B700] transition">Contact Us</a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── FOOTER ──────────────────────────────────────────────────────────────── -->
+  <footer class="border-t border-white/5 bg-[#02050E] py-10 px-4 sm:px-6 lg:px-8 relative z-10 mt-16">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+      
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 p-1 flex items-center justify-center overflow-hidden shrink-0">
+          <img src="assets/logo.png" alt="Memomes by Sathus Technology Pvt. Ltd." class="w-full h-full object-contain" />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-white font-mono">MEMOMES CLOUD</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#F5B700]/10 text-[#F5B700] font-mono border border-[#F5B700]/20">Brand</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Engineered & operated by <strong class="text-slate-200">Sathus Technology Pvt. Ltd.</strong>
+          </p>
+          <p class="text-[11px] text-slate-500">© 2026 Sathus Technology Pvt. Ltd. All rights reserved.</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-5 text-xs text-slate-400 font-mono">
+        <a href="/privacy" class="hover:text-[#F5B700] transition">Privacy Policy</a>
+        <a href="/terms" class="hover:text-[#F5B700] transition">Terms</a>
+        <a href="/grievance" class="text-[#F5B700] font-bold">Grievance</a>
+        <a href="/refund-policy" class="hover:text-[#F5B700] transition">Refunds</a>
+        <a href="/cookie-policy" class="hover:text-[#F5B700] transition">Cookies</a>
+        <a href="/contact" class="hover:text-[#F5B700] transition">Contact</a>
+      </div>
+
+    </div>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

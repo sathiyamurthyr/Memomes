@@ -85,13 +85,14 @@ export const CtaFooterSection: React.FC<{ onOpenAuth: () => void }> = ({ onOpenA
 
           {/* Developers & Company */}
           <div className="space-y-3 text-left">
-            <h4 className="text-xs font-bold text-white font-mono uppercase">Company</h4>
-            <ul className="space-y-2 text-slate-400 text-xs">
-              <li><a href="#enterprise" className="hover:text-[#F5B700] transition">Enterprise Support</a></li>
-              <li><a href="#faq" className="hover:text-[#F5B700] transition">FAQ Accordion</a></li>
-              <li><a href="#" className="hover:text-[#F5B700] transition">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-[#F5B700] transition">Terms of Service</a></li>
-              <li><a href="#" className="hover:text-[#F5B700] transition">Contact Us</a></li>
+            <h4 className="text-xs font-bold text-white font-mono uppercase">Legal & Compliance</h4>
+            <ul className="space-y-2 text-slate-400 text-xs font-mono">
+              <li><a href="https://memomes.space/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5B700] transition">Privacy Policy (DPDP)</a></li>
+              <li><a href="https://memomes.space/terms" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5B700] transition">Terms & Conditions</a></li>
+              <li><a href="https://memomes.space/grievance" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5B700] transition text-amber-300 font-semibold">Grievance Redressal</a></li>
+              <li><a href="https://memomes.space/refund-policy" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5B700] transition">Refund Policy</a></li>
+              <li><a href="https://memomes.space/cookie-policy" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5B700] transition">Cookie Policy</a></li>
+              <li><a href="https://memomes.space/contact" target="_blank" rel="noopener noreferrer" className="hover:text-[#F5B700] transition">Contact Us</a></li>
             </ul>
           </div>
 
@@ -99,11 +100,11 @@ export const CtaFooterSection: React.FC<{ onOpenAuth: () => void }> = ({ onOpenA
 
         {/* Bottom Rights Bar */}
         <div className="max-w-7xl mx-auto px-6 border-t border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px] text-slate-500">
-          <div>© 2026 Memomes Cloud Security Architecture. All rights reserved.</div>
+          <div>© 2026 Sathus Technology Pvt. Ltd. Operating MEMOMES CLOUD. All rights reserved. Registered in Chennai, India.</div>
           <div className="flex items-center gap-4">
-            <a href="#" className="hover:text-white transition" title="Global Network"><Globe className="w-4 h-4" /></a>
-            <a href="#" className="hover:text-white transition" title="Community"><MessageSquare className="w-4 h-4" /></a>
-            <a href="#" className="hover:text-white transition" title="Share Network"><Share2 className="w-4 h-4" /></a>
+            <a href="https://memomes.space" target="_blank" rel="noopener noreferrer" className="hover:text-white transition" title="Official Web"><Globe className="w-4 h-4" /></a>
+            <a href="https://memomes.space/contact" target="_blank" rel="noopener noreferrer" className="hover:text-white transition" title="Support"><MessageSquare className="w-4 h-4" /></a>
+            <a href="https://memomes.space/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition" title="Security & DPDP"><Share2 className="w-4 h-4" /></a>
           </div>
         </div>
       </footer>
