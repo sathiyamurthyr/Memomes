@@ -1,0 +1,20 @@
+{
+  "name": "memomes-space-web",
+  "version": "1.0.0",
+  "description": "Official Coming Soon & Details website for memomes.space - Zero-Knowledge Cloud Vault",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve . -l 6530",
+    "start": "npx serve .",
+    "build": "echo 'Build complete'"
+  },
+  "keywords": [
+    "memomes",
+    "memomes.space",
+    "zero-knowledge",
+    "cloud-vault",
+    "privacy"
+  ],
+  "author": "Memomes Team",
+  "license": "MIT"
+}

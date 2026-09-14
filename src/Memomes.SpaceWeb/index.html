@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memomes.space — The Sovereign Zero-Knowledge Cloud Vault</title>
+  <meta name="description" content="Official home of memomes.space. Military-grade AES-256-GCM client-side encryption, anti-screenshot protection, ephemeral links, and decentralized cloud storage. Coming Soon.">
+  <meta name="keywords" content="memomes, memomes.space, zero-knowledge cloud, encrypted vault, secure file sharing, anti-screenshot, privacy cloud">
+  <meta name="author" content="Memomes">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://memomes.space/">
+  <meta property="og:title" content="Memomes.space — Zero-Knowledge Sovereign Cloud Vault">
+  <meta property="og:description" content="Where even we can't see your data. Military-grade client encryption, anti-screenshot visual shields, and ephemeral links. Join the waitlist for 50GB free storage.">
+  <meta property="og:image" content="https://memomes.space/assets/og-preview.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://memomes.space/">
+  <meta property="twitter:title" content="Memomes.space — Zero-Knowledge Sovereign Cloud Vault">
+  <meta property="twitter:description" content="Where even we can't see your data. Join the waitlist for 50GB free storage.">
+  <meta property="twitter:image" content="https://memomes.space/assets/og-preview.png">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              gold: '#F5B700',
+              'gold-hover': '#E0A800',
+              obsidian: '#030712',
+              card: '#0B0F19',
+              border: '#1E293B',
+              emerald: '#10B981',
+              sapphire: '#3B82F6',
+            }
+          },
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 6s ease-in-out infinite',
+            'glow': 'glow 3s ease-in-out infinite alternate',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-12px)' },
+            },
+            glow: {
+              '0%': { opacity: '0.4', filter: 'blur(80px)' },
+              '100%': { opacity: '0.8', filter: 'blur(100px)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Canvas-Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #030712; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #F5B700; }
+    
+    /* Cyber Grid Background */
+    .cyber-grid {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+
+    /* Glass Effect */
+    .glass-card {
+      background: rgba(11, 15, 25, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card:hover {
+      border-color: rgba(245, 183, 0, 0.3);
+    }
+  </style>
+</head>
+
+<body class="bg-[#030712] text-slate-100 font-sans selection:bg-[#F5B700] selection:text-slate-950 overflow-x-hidden min-h-screen relative">
+
+  <!-- Dynamic Ambient Glowing Orbs -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="absolute -top-32 left-1/4 w-[600px] h-[600px] rounded-full bg-[#F5B700]/10 blur-[130px] animate-glow"></div>
+    <div class="absolute top-1/3 -right-32 w-[550px] h-[550px] rounded-full bg-[#3B82F6]/10 blur-[140px] animate-glow" style="animation-delay: 1.5s;"></div>
+    <div class="absolute bottom-10 left-10 w-[500px] h-[500px] rounded-full bg-[#10B981]/10 blur-[130px] animate-glow" style="animation-delay: 3s;"></div>
+    <div class="absolute inset-0 cyber-grid opacity-60"></div>
+  </div>
+
+  <!-- ── NAVIGATION BAR ──────────────────────────────────────────────────────── -->
+  <header class="sticky top-0 z-50 w-full border-b border-white/5 bg-[#030712]/80 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <a href="/" class="flex items-center gap-3 group">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-[#F5B700] to-[#E0A800] p-0.5 shadow-lg shadow-[#F5B700]/20 group-hover:scale-105 transition-transform duration-200">
+          <div class="w-full h-full bg-[#030712] rounded-[10px] flex items-center justify-center">
+            <i data-lucide="shield-check" class="w-6 h-6 text-[#F5B700]"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-extrabold tracking-tight text-white font-mono">MEMOMES</span>
+            <span class="px-2 py-0.5 text-[10px] font-bold font-mono uppercase rounded-full bg-[#F5B700]/15 text-[#F5B700] border border-[#F5B700]/30">.SPACE</span>
+          </div>
+          <p class="text-[10px] font-mono text-slate-400">Zero-Knowledge Cloud</p>
+        </div>
+      </a>
+
+      <!-- Desktop Nav Links -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+        <a href="#features" class="hover:text-[#F5B700] transition-colors">Features</a>
+        <a href="#architecture" class="hover:text-[#F5B700] transition-colors">Architecture</a>
+        <a href="#comparison" class="hover:text-[#F5B700] transition-colors">Comparison</a>
+        <a href="#faq" class="hover:text-[#F5B700] transition-colors">FAQ</a>
+        <a href="#security" class="hover:text-[#F5B700] transition-colors">Security Whitepaper</a>
+      </nav>
+
+      <!-- CTA & Status Badge -->
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Waitlist Live</span>
+        </div>
+        <a href="#waitlist" class="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#F5B700] hover:bg-[#E0A800] text-slate-950 font-bold text-xs sm:text-sm transition-all duration-200 shadow-lg shadow-[#F5B700]/25 hover:shadow-[#F5B700]/40 flex items-center gap-2">
+          <span>Get Early Access</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="relative z-10">
+
+    <!-- ── HERO SECTION ────────────────────────────────────────────────────────── -->
+    <section class="pt-16 pb-24 sm:pt-24 sm:pb-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
+      
+      <!-- Top Pill Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-slate-300 mb-8 shadow-inner animate-float">
+        <span class="flex h-2 w-2 relative">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F5B700] opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-[#F5B700]"></span>
+        </span>
+        <span class="text-[#F5B700] font-bold">MEMOMES.SPACE</span>
+        <span class="text-slate-600">|</span>
+        <span>Public Launch Approaching</span>
+      </div>
+
+      <!-- Main Headline -->
+      <h1 class="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-5xl mx-auto leading-[1.1] mb-6">
+        The Sovereign Cloud Vault Where <br class="hidden sm:block" />
+        <span class="bg-gradient-to-r from-white via-[#F8FAFC] to-[#F5B700] bg-clip-text text-transparent">
+          Even We Can't See Your Data.
+        </span>
+      </h1>
+
+      <!-- Subtitle -->
+      <p class="text-lg sm:text-xl text-slate-400 max-w-3xl mx-auto leading-relaxed mb-10 font-normal">
+        True <strong class="text-slate-200">Zero-Knowledge AES-256-GCM</strong> client encryption. Anti-screenshot visual shields. Dynamic recipient watermarks and self-destructing links. Your private files belong unconditionally to you.
+      </p>
+
+      <!-- ── LAUNCH COUNTDOWN TIMER ───────────────────────────────────────────── -->
+      <div class="max-w-2xl mx-auto mb-12 p-6 rounded-2xl glass-card shadow-2xl">
+        <div class="flex items-center justify-center gap-2 text-xs font-mono text-slate-400 uppercase tracking-wider mb-4">
+          <i data-lucide="clock" class="w-4 h-4 text-[#F5B700]"></i>
+          <span>Official Public Launch Countdown</span>
+        </div>
+        <div class="grid grid-cols-4 gap-3 sm:gap-6 text-center">
+          <div class="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/5">
+            <span id="countdown-days" class="text-2xl sm:text-4xl font-black text-white font-mono block">18</span>
+            <span class="text-[10px] sm:text-xs font-mono text-slate-400 uppercase">Days</span>
+          </div>
+          <div class="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/5">
+            <span id="countdown-hours" class="text-2xl sm:text-4xl font-black text-white font-mono block">06</span>
+            <span class="text-[10px] sm:text-xs font-mono text-slate-400 uppercase">Hours</span>
+          </div>
+          <div class="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/5">
+            <span id="countdown-minutes" class="text-2xl sm:text-4xl font-black text-white font-mono block">42</span>
+            <span class="text-[10px] sm:text-xs font-mono text-slate-400 uppercase">Minutes</span>
+          </div>
+          <div class="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/5">
+            <span id="countdown-seconds" class="text-2xl sm:text-4xl font-black text-[#F5B700] font-mono block">15</span>
+            <span class="text-[10px] sm:text-xs font-mono text-slate-400 uppercase">Seconds</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── WAITLIST SIGNUP FORM ─────────────────────────────────────────────── -->
+      <div id="waitlist" class="max-w-xl mx-auto scroll-mt-28">
+        <form id="waitlist-form" onsubmit="handleWaitlistSubmit(event)" class="flex flex-col sm:flex-row gap-3 p-2 rounded-2xl bg-slate-900/90 border border-white/15 shadow-2xl focus-within:border-[#F5B700] transition-all">
+          <div class="relative flex-1 flex items-center">
+            <i data-lucide="mail" class="w-5 h-5 text-slate-500 absolute left-4 pointer-events-none"></i>
+            <input 
+              type="email" 
+              id="waitlist-email" 
+              required 
+              placeholder="Enter your email for priority beta..." 
+              class="w-full pl-12 pr-4 py-3 bg-transparent text-white placeholder-slate-500 text-sm focus:outline-none font-medium"
+            />
+          </div>
+          <button 
+            type="submit" 
+            id="waitlist-btn" 
+            class="px-6 py-3.5 rounded-xl bg-[#F5B700] hover:bg-[#E0A800] text-slate-950 font-bold text-sm tracking-wide transition-all duration-200 flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-[#F5B700]/25 cursor-pointer active:scale-95"
+          >
+            <span>Claim 50GB Free Pass</span>
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+          </button>
+        </form>
+
+        <!-- Waitlist Confirmation Card (Hidden Initially) -->
+        <div id="waitlist-success" class="hidden mt-4 p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-left animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+              <i data-lucide="check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                <span>You're on the early access waitlist!</span>
+                <span id="waitlist-number" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-mono font-bold">#2,842</span>
+              </h4>
+              <p class="text-xs text-slate-300 mt-1">
+                Your <strong>50GB Lifetime Sovereign Vault Pass</strong> has been reserved for <span id="confirmed-email" class="text-white font-mono"></span>. We'll send your cryptographic private key invite directly to your inbox.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trust Subtext -->
+        <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-mono text-slate-400 mt-4">
+          <span class="flex items-center gap-1.5"><i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-400"></i> No Credit Card Required</span>
+          <span>•</span>
+          <span class="flex items-center gap-1.5"><i data-lucide="gift" class="w-3.5 h-3.5 text-[#F5B700]"></i> 50GB Free Lifetime Tier</span>
+          <span>•</span>
+          <span class="flex items-center gap-1.5"><i data-lucide="shield" class="w-3.5 h-3.5 text-blue-400"></i> 100% Zero-Knowledge</span>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ── HOW MEMOMES WORKS (ARCHITECTURE FLOW) ──────────────────────────────── -->
+    <section id="architecture" class="py-20 border-t border-b border-white/5 bg-[#070B14] relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <span class="text-xs font-mono font-bold uppercase tracking-wider text-[#F5B700] px-3 py-1 rounded-full bg-[#F5B700]/10 border border-[#F5B700]/20">
+            Cryptographic Guarantee
+          </span>
+          <h2 class="text-3xl sm:text-5xl font-extrabold text-white mt-4 mb-4">
+            How Zero-Knowledge Protection Works
+          </h2>
+          <p class="text-slate-400 text-sm sm:text-base">
+            Conventional clouds hold the master decryption key to all your files. In Memomes, encryption happens entirely inside your browser before a single byte touches the network.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          
+          <!-- Step 1 -->
+          <div class="p-6 rounded-2xl glass-card relative group hover:-translate-y-1 transition-all">
+            <div class="w-12 h-12 rounded-xl bg-[#F5B700]/10 border border-[#F5B700]/30 text-[#F5B700] flex items-center justify-center font-mono font-bold text-lg mb-4">
+              01
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <span>Key Derivation</span>
+              <i data-lucide="key" class="w-4 h-4 text-[#F5B700]"></i>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Your device runs <strong>PBKDF2 with 120,000 iterations</strong> using SHA-256 and unique per-file salts. Keys are computed in RAM and never saved or transmitted.
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="p-6 rounded-2xl glass-card relative group hover:-translate-y-1 transition-all">
+            <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center font-mono font-bold text-lg mb-4">
+              02
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <span>AES-256-GCM Seal</span>
+              <i data-lucide="lock" class="w-4 h-4 text-blue-400"></i>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Your document, image, audio, or video file is sealed into a binary ciphertext blob inside your browser sandbox using authenticated Galois/Counter Mode.
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="p-6 rounded-2xl glass-card relative group hover:-translate-y-1 transition-all">
+            <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center font-mono font-bold text-lg mb-4">
+              03
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <span>Opaque Storage</span>
+              <i data-lucide="server" class="w-4 h-4 text-purple-400"></i>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Only encrypted gibberish is transmitted to Backblaze B2 decentralized servers via signed S3 PUT requests. Object keys and filenames are opaque hashes.
+            </p>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="p-6 rounded-2xl glass-card relative group hover:-translate-y-1 transition-all">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center font-mono font-bold text-lg mb-4">
+              04
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <span>Ephemeral Access</span>
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+            </h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Recipients decrypt on-the-fly via self-destructing share links with anti-screenshot shields, dynamic viewer IP watermarks, and auto-burn timers.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ── CORE FEATURES BENTO GRID ────────────────────────────────────────────── -->
+    <section id="features" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+          Engineered for Sovereignty
+        </span>
+        <h2 class="text-3xl sm:text-5xl font-extrabold text-white mt-4 mb-4">
+          Everything You Need to Reclaim Digital Privacy
+        </h2>
+        <p class="text-slate-400 text-sm sm:text-base">
+          Built from the ground up to protect intellectual property, financial documents, media, and enterprise secrets.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Bento 1: Large Card (Zero-Knowledge) -->
+        <div class="md:col-span-2 p-8 rounded-3xl glass-card relative overflow-hidden group">
+          <div class="absolute top-0 right-0 w-64 h-64 bg-[#F5B700]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#F5B700]/10 transition-colors"></div>
+          <div class="w-12 h-12 rounded-2xl bg-[#F5B700]/10 border border-[#F5B700]/30 text-[#F5B700] flex items-center justify-center mb-6">
+            <i data-lucide="shield-alert" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-3">Anti-Screenshot Shield & Watermarking</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-6 max-w-xl">
+            When you share confidential files, Memomes deploys an active visual shield. Screen captures are intercepted, PrintScreen keys are neutralized, and dynamic viewer watermarks embed the recipient's IP, email, and timestamp across every frame.
+          </p>
+          <div class="p-4 rounded-xl bg-black/40 border border-white/10 font-mono text-xs text-slate-300 flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Active Shield: PrintScreen Blocked • Canvas Overlay Active • Zero-Trust Viewer</span>
+          </div>
+        </div>
+
+        <!-- Bento 2: Ephemeral Links -->
+        <div class="p-8 rounded-3xl glass-card relative overflow-hidden group">
+          <div class="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center mb-6">
+            <i data-lucide="flame" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-3">Self-Destructing Share Links</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Set links to burn immediately after 1 view or expire in 10 minutes, 24 hours, or 7 days. Enforce PIN codes and one-time view quotas.
+          </p>
+          <div class="flex items-center gap-2 text-xs font-mono text-purple-400 font-bold">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+            <span>Burn-After-Reading Engine</span>
+          </div>
+        </div>
+
+        <!-- Bento 3: Local Private AI -->
+        <div class="p-8 rounded-3xl glass-card relative overflow-hidden group">
+          <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center mb-6">
+            <i data-lucide="cpu" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-3">On-Device Private AI</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Perform natural-language semantic searches across PDF contracts and spreadsheets. Vector embeddings run locally in WebAssembly — zero telemetry.
+          </p>
+          <div class="flex items-center gap-2 text-xs font-mono text-blue-400 font-bold">
+            <i data-lucide="binary" class="w-4 h-4"></i>
+            <span>384-Dim Local MiniLM Embeddings</span>
+          </div>
+        </div>
+
+        <!-- Bento 4: Large Card (Decentralized Storage) -->
+        <div class="md:col-span-2 p-8 rounded-3xl glass-card relative overflow-hidden group">
+          <div class="absolute bottom-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/10 transition-colors"></div>
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mb-6">
+            <i data-lucide="hard-drive" class="w-6 h-6"></i>
+          </div>
+          <h3 class="text-2xl font-bold text-white mb-3">Decentralized Backblaze B2 Storage Grid</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-6 max-w-xl">
+            Files are sharded and stored across redundant global S3-compatible Backblaze B2 clusters. Enjoy 99.999999999% (11 nines) durability, direct presigned uploads, and lightning multi-gigabit streaming speeds with no vendor lock-in.
+          </p>
+          <div class="grid grid-cols-3 gap-3 text-center font-mono text-xs">
+            <div class="p-3 rounded-xl bg-white/5 border border-white/5">
+              <span class="text-white font-bold block text-sm">11 Nines</span>
+              <span class="text-slate-500 text-[10px]">Durability</span>
+            </div>
+            <div class="p-3 rounded-xl bg-white/5 border border-white/5">
+              <span class="text-[#F5B700] font-bold block text-sm">0 Masters</span>
+              <span class="text-slate-500 text-[10px]">Zero Backdoors</span>
+            </div>
+            <div class="p-3 rounded-xl bg-white/5 border border-white/5">
+              <span class="text-emerald-400 font-bold block text-sm">100% S3</span>
+              <span class="text-slate-500 text-[10px]">CORS Compatible</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ── COMPARISON MATRIX ───────────────────────────────────────────────────── -->
+    <section id="comparison" class="py-20 border-t border-b border-white/5 bg-[#070B14]">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <div class="text-center max-w-3xl mx-auto mb-16">
+          <span class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20">
+            Honest Benchmarks
+          </span>
+          <h2 class="text-3xl sm:text-5xl font-extrabold text-white mt-4 mb-4">
+            How Memomes Space Compares
+          </h2>
+          <p class="text-slate-400 text-sm sm:text-base">
+            See why privacy-conscious professionals and enterprises choose true sovereign encryption.
+          </p>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-white/10 text-xs font-mono text-slate-400 uppercase">
+                <th class="py-4 px-6">Feature</th>
+                <th class="py-4 px-6 text-[#F5B700] font-bold">Memomes.space</th>
+                <th class="py-4 px-6">Google Drive</th>
+                <th class="py-4 px-6">Dropbox</th>
+                <th class="py-4 px-6">Proton Drive</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5 font-medium">
+              <tr class="hover:bg-white/[0.02]">
+                <td class="py-4 px-6 text-white font-semibold flex items-center gap-2">
+                  <i data-lucide="lock" class="w-4 h-4 text-[#F5B700]"></i> Client-Side Zero-Knowledge
+                </td>
+                <td class="py-4 px-6 text-emerald-400 font-bold font-mono">✔ AES-256-GCM</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ No (Server Decrypts)</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ No (Server Decrypts)</td>
+                <td class="py-4 px-6 text-emerald-400 font-mono">✔ OpenPGP</td>
+              </tr>
+              <tr class="hover:bg-white/[0.02]">
+                <td class="py-4 px-6 text-white font-semibold flex items-center gap-2">
+                  <i data-lucide="eye-off" class="w-4 h-4 text-[#F5B700]"></i> Anti-Screenshot Visual Shield
+                </td>
+                <td class="py-4 px-6 text-emerald-400 font-bold font-mono">✔ Active Shield</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ None</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ None</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ None</td>
+              </tr>
+              <tr class="hover:bg-white/[0.02]">
+                <td class="py-4 px-6 text-white font-semibold flex items-center gap-2">
+                  <i data-lucide="stamp" class="w-4 h-4 text-[#F5B700]"></i> Dynamic Viewer IP Watermarking
+                </td>
+                <td class="py-4 px-6 text-emerald-400 font-bold font-mono">✔ Included</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ Enterprise Only ($)</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ Enterprise Only ($)</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ None</td>
+              </tr>
+              <tr class="hover:bg-white/[0.02]">
+                <td class="py-4 px-6 text-white font-semibold flex items-center gap-2">
+                  <i data-lucide="flame" class="w-4 h-4 text-[#F5B700]"></i> 1-View Auto-Destruct Links
+                </td>
+                <td class="py-4 px-6 text-emerald-400 font-bold font-mono">✔ Native Burner</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ No</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ No</td>
+                <td class="py-4 px-6 text-slate-400 font-mono">Timer Only</td>
+              </tr>
+              <tr class="hover:bg-white/[0.02]">
+                <td class="py-4 px-6 text-white font-semibold flex items-center gap-2">
+                  <i data-lucide="cpu" class="w-4 h-4 text-[#F5B700]"></i> Local WebAssembly Vector AI
+                </td>
+                <td class="py-4 px-6 text-emerald-400 font-bold font-mono">✔ 100% On-Device</td>
+                <td class="py-4 px-6 text-amber-400 font-mono">Cloud Gemini (Trained)</td>
+                <td class="py-4 px-6 text-amber-400 font-mono">Cloud AI</td>
+                <td class="py-4 px-6 text-rose-400 font-mono">✘ None</td>
+              </tr>
+              <tr class="hover:bg-white/[0.02]">
+                <td class="py-4 px-6 text-white font-semibold flex items-center gap-2">
+                  <i data-lucide="gift" class="w-4 h-4 text-[#F5B700]"></i> Early Access Waitlist Perk
+                </td>
+                <td class="py-4 px-6 text-[#F5B700] font-bold font-mono">50 GB Free Lifetime</td>
+                <td class="py-4 px-6 text-slate-400 font-mono">15 GB Shared</td>
+                <td class="py-4 px-6 text-slate-400 font-mono">2 GB</td>
+                <td class="py-4 px-6 text-slate-400 font-mono">5 GB</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ── SECURITY & SPECS DETAILS ────────────────────────────────────────────── -->
+    <section id="security" class="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#0B0F19] to-[#030712] border border-white/10 shadow-2xl relative overflow-hidden">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F5B700]/10 border border-[#F5B700]/30 text-xs font-mono text-[#F5B700] mb-4">
+              <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+              <span>Cryptographic Blueprint</span>
+            </div>
+            <h3 class="text-3xl font-extrabold text-white mb-4">
+              Technical Specifications
+            </h3>
+            <p class="text-slate-300 text-sm leading-relaxed mb-6">
+              Memomes operates under zero-trust assumptions. Even with a subpoena or physical server access, server operators see only opaque AES ciphertext blocks with zero mathematical ability to derive plaintext.
+            </p>
+
+            <ul class="space-y-3 font-mono text-xs text-slate-300">
+              <li class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span><strong>Symmetric Cipher:</strong> AES-256-GCM (Galois/Counter Mode 128-bit auth tag)</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span><strong>Key Derivation:</strong> PBKDF2 (SHA-256, 120,000 iterations, 32-byte CSPRNG salt)</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span><strong>Signing Protocol:</strong> AWS Signature Version 4 HMAC-SHA256 presigned PUT</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span><strong>Storage Architecture:</strong> Backblaze B2 Decentralized S3-Compatible Storage</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span><strong>Deployment:</strong> Global Edge Anycast CDN on Vercel Infrastructure</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Code / Spec Block -->
+          <div class="rounded-2xl bg-black/70 border border-white/10 p-5 font-mono text-xs text-slate-300 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4 text-[11px] text-slate-500">
+              <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> memomes_payload.json</span>
+              <span>AES-256-GCM</span>
+            </div>
+            <pre class="overflow-x-auto text-emerald-400 leading-relaxed font-mono"><code>{
+  <span class="text-slate-400">"domain":</span> <span class="text-[#F5B700]">"memomes.space"</span>,
+  <span class="text-slate-400">"version":</span> <span class="text-blue-400">2</span>,
+  <span class="text-slate-400">"algorithm":</span> <span class="text-[#F5B700]">"AES-256-GCM"</span>,
+  <span class="text-slate-400">"kdf":</span> <span class="text-[#F5B700]">"PBKDF2-HMAC-SHA256"</span>,
+  <span class="text-slate-400">"iterations":</span> <span class="text-blue-400">120000</span>,
+  <span class="text-slate-400">"salt":</span> <span class="text-purple-400">"7c9a...32b_csprng"</span>,
+  <span class="text-slate-400">"iv":</span> <span class="text-purple-400">"4d1e...12b_nonce"</span>,
+  <span class="text-slate-400">"ciphertext":</span> <span class="text-slate-400">"[OPAQUE_BINARY_BLOB]"</span>,
+  <span class="text-slate-400">"server_knowledge":</span> <span class="text-rose-400">false</span>,
+  <span class="text-slate-400">"client_verified":</span> <span class="text-emerald-400">true</span>
+}</code></pre>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ── FAQ SECTION ─────────────────────────────────────────────────────────── -->
+    <section id="faq" class="py-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-14">
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-3">Frequently Asked Questions</h2>
+        <p class="text-slate-400 text-sm">Everything you need to know about memomes.space and the launch.</p>
+      </div>
+
+      <div class="space-y-4">
+        
+        <details class="p-6 rounded-2xl glass-card group cursor-pointer">
+          <summary class="flex items-center justify-between font-bold text-white text-base list-none">
+            <span>What does "Zero-Knowledge" actually mean?</span>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"></i>
+          </summary>
+          <p class="text-slate-400 text-sm mt-3 leading-relaxed">
+            It means the service provider (Memomes) has zero mathematical capability to decrypt your files, view your file names, or read your metadata. Your password and encryption keys exist solely in your browser's RAM.
+          </p>
+        </details>
+
+        <details class="p-6 rounded-2xl glass-card group cursor-pointer">
+          <summary class="flex items-center justify-between font-bold text-white text-base list-none">
+            <span>Can Memomes recover my password if I lose it?</span>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"></i>
+          </summary>
+          <p class="text-slate-400 text-sm mt-3 leading-relaxed">
+            No. Because of our strict Zero-Knowledge guarantee, there is no "Forgot Password" backdoor on our servers. During onboarding, you are provided with an emergency cryptographic Recovery Phrase that only you possess.
+          </p>
+        </details>
+
+        <details class="p-6 rounded-2xl glass-card group cursor-pointer">
+          <summary class="flex items-center justify-between font-bold text-white text-base list-none">
+            <span>When does memomes.space officially open for beta users?</span>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"></i>
+          </summary>
+          <p class="text-slate-400 text-sm mt-3 leading-relaxed">
+            Beta invitations are rolling out in batches every week starting October 2026. Waitlist members who join early receive priority batch placement and 50GB of free lifetime encrypted vault storage.
+          </p>
+        </details>
+
+        <details class="p-6 rounded-2xl glass-card group cursor-pointer">
+          <summary class="flex items-center justify-between font-bold text-white text-base list-none">
+            <span>Where are the files physically hosted?</span>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"></i>
+          </summary>
+          <p class="text-slate-400 text-sm mt-3 leading-relaxed">
+            Encrypted blobs are stored in enterprise Backblaze B2 data centers with 99.999999999% durability and multi-region redundancy. All files are fully encrypted before reaching cloud storage.
+          </p>
+        </details>
+
+        <details class="p-6 rounded-2xl glass-card group cursor-pointer">
+          <summary class="flex items-center justify-between font-bold text-white text-base list-none">
+            <span>Can I share files securely with people who don't have an account?</span>
+            <i data-lucide="chevron-down" class="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform"></i>
+          </summary>
+          <p class="text-slate-400 text-sm mt-3 leading-relaxed">
+            Yes! Memomes generates end-to-end encrypted sharing links where the decryption key is passed in the URL fragment (`#key=...`). The key never touches our server, and recipients can view files in their browser without signing up.
+          </p>
+        </details>
+
+      </div>
+    </section>
+
+  </main>
+
+
+  <!-- ── FOOTER ──────────────────────────────────────────────────────────────── -->
+  <footer class="border-t border-white/5 bg-[#02050E] py-12 px-4 sm:px-6 lg:px-8 relative z-10">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+      
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-[#F5B700]/10 border border-[#F5B700]/30 text-[#F5B700] flex items-center justify-center">
+          <i data-lucide="shield" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <span class="text-sm font-bold text-white font-mono">MEMOMES.SPACE</span>
+          <p class="text-xs text-slate-500">© 2026 Memomes Space Inc. All rights reserved.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-6 text-xs text-slate-400 font-mono">
+        <span class="flex items-center gap-1.5 text-emerald-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          <span>Zero-Knowledge Verified</span>
+        </span>
+        <a href="#waitlist" class="hover:text-[#F5B700] transition">Join Waitlist</a>
+        <a href="#security" class="hover:text-[#F5B700] transition">Security</a>
+        <a href="https://namecheap.com" target="_blank" rel="noopener" class="text-slate-500 hover:text-slate-300 transition">DNS: Namecheap</a>
+      </div>
+
+    </div>
+  </footer>
+
+
+  <!-- ── JAVASCRIPT: COUNTDOWN, WAITLIST, CONFETTI ──────────────────────────── -->
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // ── Live Countdown to Launch (Set to 18 Days from now) ─────────────────────
+    const launchDate = new Date();
+    launchDate.setDate(launchDate.getDate() + 18);
+    launchDate.setHours(launchDate.getHours() + 6);
+
+    function updateCountdown() {
+      const now = new Date().getTime();
+      const distance = launchDate.getTime() - now;
+
+      if (distance < 0) {
+        document.getElementById('countdown-days').innerText = '00';
+        document.getElementById('countdown-hours').innerText = '00';
+        document.getElementById('countdown-minutes').innerText = '00';
+        document.getElementById('countdown-seconds').innerText = '00';
+        return;
+      }
+
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+      document.getElementById('countdown-days').innerText = String(days).padStart(2, '0');
+      document.getElementById('countdown-hours').innerText = String(hours).padStart(2, '0');
+      document.getElementById('countdown-minutes').innerText = String(minutes).padStart(2, '0');
+      document.getElementById('countdown-seconds').innerText = String(seconds).padStart(2, '0');
+    }
+    setInterval(updateCountdown, 1000);
+    updateCountdown();
+
+    // ── Check if already on waitlist ──────────────────────────────────────────
+    const savedEmail = localStorage.getItem('memomes_space_waitlist_email');
+    if (savedEmail) {
+      showSuccessState(savedEmail, localStorage.getItem('memomes_space_waitlist_num') || '#2,842');
+    }
+
+    // ── Handle Waitlist Submission ────────────────────────────────────────────
+    function handleWaitlistSubmit(e) {
+      e.preventDefault();
+      const emailInput = document.getElementById('waitlist-email');
+      const email = emailInput.value.trim();
+      if (!email) return;
+
+      const randomNum = '#' + (2800 + Math.floor(Math.random() * 200)).toLocaleString();
+
+      localStorage.setItem('memomes_space_waitlist_email', email);
+      localStorage.setItem('memomes_space_waitlist_num', randomNum);
+
+      // Trigger Confetti Burst
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#F5B700', '#10B981', '#3B82F6', '#FFFFFF']
+      });
+
+      showSuccessState(email, randomNum);
+    }
+
+    function showSuccessState(email, num) {
+      document.getElementById('waitlist-form').classList.add('hidden');
+      const successDiv = document.getElementById('waitlist-success');
+      successDiv.classList.remove('hidden');
+      document.getElementById('confirmed-email').innerText = email;
+      document.getElementById('waitlist-number').innerText = num;
+    }
+  </script>
+
+</body>
+</html>
