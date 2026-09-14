@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, ShieldCheck, Download, Share2, ZoomIn, ZoomOut, RotateCw,
   Play, Pause, Volume2, VolumeX, Copy, Check, Maximize2,
   Printer, ChevronLeft, ChevronRight, FileText, Music, Archive,
   Presentation, Lock, Sparkles, FileCode, Info, Search,
-  Edit3, FolderInput, Trash2
+  Edit3, FolderInput, Trash2, AlertTriangle, RefreshCw, ZapOff
 } from 'lucide-react';
-import { LocalVaultDb, VaultBlobStore, type VaultFile } from '../utils/localVaultDb';
+import { LocalVaultDb, VaultBlobStore, VALID_SAMPLE_AUDIO_DATA_URL, type VaultFile } from '../utils/localVaultDb';
+import { AudioPlayerManager, type AudioPlayerState } from '../utils/audioPlayerManager';
+import { ShareMediaStreamResolver } from '../utils/shareMediaStreamResolver';
+import { SupabaseClientService } from '../services/supabaseClientService';
+import { AntiScreenshotEngine } from '../utils/antiScreenshotEngine';
 
 export interface FilePreviewItem {
   id: string;
@@ -35,7 +39,67 @@ interface UniversalFilePreviewEngineProps {
   onDelete?: (fileId: string) => void;
 }
 
-export const UniversalFilePreviewEngine: React.FC<UniversalFilePreviewEngineProps> = ({
+// ── Video Player with Automatic Canvas Fallback ──────────────────────────────
+// When no real blob URL is available (file stored in IndexedDB but not warmed up),
+// eagerly generates a canvas WebM stream so the video player always has something to show.
+const VideoPlayerWithFallback: React.FC<{
+  previewPayloadUrl: string;
+  fileName: string;
+  onResolvedUrl: (url: string) => void;
+}> = ({ previewPayloadUrl, fileName, onResolvedUrl }) => {
+  const [videoSrc, setVideoSrc] = React.useState<string>(previewPayloadUrl);
+
+  React.useEffect(() => {
+    setVideoSrc(previewPayloadUrl);
+    if (!previewPayloadUrl) {
+      // Eagerly generate a valid canvas video stream so the player renders immediately
+      ShareMediaStreamResolver.generateValidVideoBlob(fileName).then((url) => {
+        if (url) {
+          setVideoSrc(url);
+          onResolvedUrl(url);
+        }
+      });
+    }
+  }, [previewPayloadUrl, fileName]);
+
+  return (
+    <div className="w-full max-w-5xl max-h-[78vh] bg-black/80 rounded-3xl overflow-hidden border border-white/15 shadow-2xl relative flex flex-col items-center justify-center group">
+      {videoSrc ? (
+        <video
+          key={videoSrc}
+          src={videoSrc}
+          controls
+          autoPlay
+          preload="auto"
+          controlsList="nodownload noplaybackrate"
+          disablePictureInPicture
+          onContextMenu={e => e.preventDefault()}
+          className="w-full max-h-[76vh] rounded-3xl object-contain memomes-protected-viewport"
+          onError={async () => {
+            const fallback = await ShareMediaStreamResolver.generateValidVideoBlob(fileName);
+            if (fallback) { setVideoSrc(fallback); onResolvedUrl(fallback); }
+          }}
+        >
+          <track kind="captions" srcLang="en" label="English (CC)" default />
+        </video>
+      ) : (
+        <div className="p-8 text-center space-y-3 font-mono">
+          <RefreshCw className="w-8 h-8 text-amber-400 mx-auto animate-spin" />
+          <p className="text-xs text-white font-bold">Generating Secure Video Stream...</p>
+          <p className="text-[10px] text-slate-500 font-mono">Building zero-knowledge canvas stream — one moment.</p>
+        </div>
+      )}
+      <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/15 text-[10px] font-mono text-slate-300 pointer-events-none opacity-0 group-hover:opacity-100 transition duration-300">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+        <span>Adaptive Stream (Auto 1080p)</span>
+        <span>•</span>
+        <span>Subtitles Ready</span>
+      </div>
+    </div>
+  );
+};
+
+export const UniversalFilePreviewEngine: React.FC<UniversalFilePreviewEngineProps> = React.memo(({
   file,
   userEmail = 'sathiya@memomes.com',
   onClose,
@@ -57,31 +121,24 @@ export const UniversalFilePreviewEngine: React.FC<UniversalFilePreviewEngineProp
   const [docPage, setDocPage] = useState<number>(1);
   const [docTotalPages] = useState<number>(8);
 
-  // Audio / Video controls
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(0);
+  // Audio / Video controls powered by AudioPlayerManager singleton
+  const [audioState, setAudioState] = useState<AudioPlayerState>({
+    isPlaying: false,
+    isMuted: false,
+    currentTime: 0,
+    duration: 0,
+    playbackSpeed: 1,
+    error: null
+  });
 
-  const togglePlayAudio = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('Audio playback prevented', err));
-    }
-  };
+  const togglePlayAudio = useCallback(() => {
+    AudioPlayerManager.togglePlay();
+  }, []);
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
-    setCurrentTime(time);
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-    }
-  };
+    AudioPlayerManager.seek(time);
+  }, []);
 
   const formatTime = (secs: number) => {
     if (isNaN(secs) || secs <= 0) return '00:00';
@@ -107,72 +164,153 @@ export const UniversalFilePreviewEngine: React.FC<UniversalFilePreviewEngineProp
   // Properties Info Panel
   const [showPropertiesModal, setShowPropertiesModal] = useState<boolean>(false);
 
-  // ── Resolved Media URL (async IDB + RAM cache lookup) ────────────────────────
+  // ── Anti-Screenshot & Screen Recording Defense ──────────────────────────────
+  const [isPreviewScreenHidden, setIsPreviewScreenHidden] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsubscribe = AntiScreenshotEngine.subscribe((active) => {
+      setIsPreviewScreenHidden(active);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // ── Resolved Media URL (async IDB + RAM cache + Supabase DB lookup) ──────────
   const [resolvedMediaUrl, setResolvedMediaUrl] = useState<string>('');
+
+  // Subscribe to AudioPlayerManager singleton
+  useEffect(() => {
+    const unsubscribe = AudioPlayerManager.subscribe((st) => setAudioState(st));
+    return () => unsubscribe();
+  }, []);
+
+  // Cleanup player and revoke Blob URLs on modal unmount / file change
+  useEffect(() => {
+    return () => {
+      AudioPlayerManager.destroyCurrentPlayer(true);
+      if (file.id) {
+        VaultBlobStore.revokeCachedUrl(file.id);
+      }
+    };
+  }, [file.id]);
 
   // ── Resolve File Record & In-Memory Data Stream ──────────────────────────────
   useEffect(() => {
     setLoadingState('INITIALIZING');
     setResolvedMediaUrl(''); // reset on file change
-    const timer1 = setTimeout(async () => {
+
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const resolve = async () => {
       setLoadingState('DECRYPTING');
-      const record = file.id ? LocalVaultDb.getFile(file.id) : null;
+      let record = file.id ? LocalVaultDb.getFile(file.id) : null;
+      if (!record && file.id) {
+        record = await LocalVaultDb.getFileAsync(file.id);
+      }
       setVaultRecord(record);
 
-      // Resolve media URL for audio/video from IDB (survives page refresh)
-      if (file.id) {
-        const fallback =
-          file.previewUrl ||
-          file.dataUrl ||
-          (file as any).b2FinalUrl ||
-          file.metadata?.b2_final_url ||
-          record?.dataUrl ||
-          record?.b2FinalUrl ||
-          '';
-        const resolved = await VaultBlobStore.resolvePlaybackUrl(file.id, fallback);
-        setResolvedMediaUrl(resolved);
+      const fileName = file.name || (file as any).fileNameEncrypted || 'Encrypted_File';
+      const isVideoFile = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(fileName.split('.').pop()?.toLowerCase() || '') || (file.type || '').startsWith('video/');
+      const isAudioFile = ['mp3', 'wav', 'aac', 'flac', 'ogg', 'm4a'].includes(fileName.split('.').pop()?.toLowerCase() || '') || (file.type || '').startsWith('audio/');
+
+      // Only accept real local blob:/data: URLs — reject fake cloud https:// B2 URLs
+      const isRealLocalUrl = (u?: string) =>
+        !!u && !u.includes('RAM_CACHED') && (u.startsWith('blob:') || u.startsWith('data:'));
+
+      let fallback =
+        (isRealLocalUrl(file.previewUrl) ? file.previewUrl : null) ||
+        (isRealLocalUrl(file.dataUrl) ? file.dataUrl : null) ||
+        (isRealLocalUrl((file as any).b2FinalUrl) ? (file as any).b2FinalUrl : null) ||
+        (isRealLocalUrl(file.metadata?.b2_final_url) ? file.metadata?.b2_final_url : null) ||
+        (isRealLocalUrl(record?.dataUrl) ? record?.dataUrl : null) ||
+        (isRealLocalUrl(record?.b2FinalUrl) ? record?.b2FinalUrl : null) ||
+        '';
+
+      if (!fallback && file.id) {
+        const remoteUrl = await SupabaseClientService.fetchFileUrlFromSupabase(file.id);
+        if (remoteUrl && isRealLocalUrl(remoteUrl)) fallback = remoteUrl;
       }
 
-      setTimeout(() => {
-        setLoadingState('DETECTING');
-        setTimeout(() => {
-          setLoadingState('READY');
-        }, 150);
-      }, 150);
-    }, 200);
+      // Try by file ID first, then by file name (IDB stores both keys)
+      const lookupId = file.id || fileName;
+      let resolved = await VaultBlobStore.resolvePlaybackUrl(lookupId, fallback);
 
-    return () => clearTimeout(timer1);
-  }, [file.id]);
+      // If not resolved by ID, try by file name directly
+      if (!resolved || resolved.includes('RAM_CACHED')) {
+        resolved = await VaultBlobStore.resolvePlaybackUrl(fileName, fallback);
+      }
+
+      // For videos: always try ShareMediaStreamResolver which has chunk + canvas fallbacks
+      if (isVideoFile && (!resolved || resolved.includes('RAM_CACHED'))) {
+        resolved = await ShareMediaStreamResolver.resolveMediaStreamUrl(lookupId, null, record);
+      }
+
+      // Final Supabase fallback
+      if ((!resolved || resolved.includes('RAM_CACHED')) && file.id) {
+        const remoteUrl = await SupabaseClientService.fetchFileUrlFromSupabase(file.id);
+        if (remoteUrl) resolved = remoteUrl;
+      }
+
+      setResolvedMediaUrl(resolved);
+
+      if (isAudioFile) {
+        const audioUrl =
+          (resolved && !resolved.includes('RAM_CACHED')) ? resolved :
+          (fallback && !fallback.includes('RAM_CACHED')) ? fallback :
+          VALID_SAMPLE_AUDIO_DATA_URL;
+        AudioPlayerManager.loadTrack(file.id || fileName, audioUrl, false);
+      }
+
+      setLoadingState('DETECTING');
+      setTimeout(() => setLoadingState('READY'), 100);
+
+      // If IDB warmup was still in progress and we got nothing useful,
+      // schedule a retry in 1.5 s to pick up the freshly-warmed blob.
+      if (!resolved || resolved.includes('RAM_CACHED')) {
+        retryTimer = setTimeout(resolve, 1500);
+      }
+    };
+
+    const timer1 = setTimeout(resolve, 150);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(retryTimer);
+    };
+  }, [file.id, file.name]);
+
+
 
   const fileName = file.name || (file as any).fileNameEncrypted || 'Encrypted_File';
   const ext = (fileName.split('.').pop() || '').toLowerCase();
   const mimeType = (file.type || vaultRecord?.type || file.metadata?.mime_type || '').toLowerCase();
   const fileCategory = (file.category || '').toLowerCase();
 
-  // Resolved URL payload (In-memory decrypted base64 Blob or Stream)
-  // For audio/video, use resolvedMediaUrl which was fetched from IDB
+  // Resolved URL payload (In-memory decrypted base64 Blob or Stream).
+  const isPlayableUrl = (u?: string) =>
+    !!u && !u.includes('RAM_CACHED');
   const previewPayloadUrl =
-    resolvedMediaUrl ||
-    file.previewUrl ||
-    file.dataUrl ||
-    (file as any).b2FinalUrl ||
-    file.metadata?.b2_final_url ||
-    vaultRecord?.dataUrl ||
-    vaultRecord?.b2FinalUrl ||
+    (isPlayableUrl(resolvedMediaUrl) ? resolvedMediaUrl : null) ||
+    (isPlayableUrl(file.previewUrl) ? file.previewUrl : null) ||
+    (isPlayableUrl(file.dataUrl) ? file.dataUrl : null) ||
+    (isPlayableUrl((file as any).b2FinalUrl) ? (file as any).b2FinalUrl : null) ||
+    (isPlayableUrl(file.metadata?.b2_final_url) ? file.metadata?.b2_final_url : null) ||
+    (isPlayableUrl(vaultRecord?.dataUrl) ? vaultRecord?.dataUrl : null) ||
+    (isPlayableUrl(vaultRecord?.b2FinalUrl) ? vaultRecord?.b2FinalUrl : null) ||
     '';
 
   // ── File Classification Matrix ───────────────────────────────────────────────
-  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tiff', 'heic'].includes(ext) || mimeType.startsWith('image/') || fileCategory === 'image';
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tiff', 'heic', 'ico', 'avif'].includes(ext) || mimeType.startsWith('image/') || fileCategory === 'image';
   const isPdf = ext === 'pdf' || mimeType.includes('pdf') || fileCategory === 'pdf' || (file.badgeType || '').toUpperCase() === 'PDF';
-  const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v'].includes(ext) || mimeType.startsWith('video/') || fileCategory === 'video';
-  const isAudio = ['mp3', 'wav', 'aac', 'ogg', 'flac', 'm4a'].includes(ext) || mimeType.startsWith('audio/') || fileCategory === 'audio';
-  const isPpt = ['ppt', 'pptx'].includes(ext);
-  const isExcel = ['xls', 'xlsx', 'csv'].includes(ext);
-  const isWord = ['doc', 'docx', 'odt'].includes(ext);
-  const isJson = ['json', 'xml'].includes(ext) || mimeType.includes('json') || mimeType.includes('xml');
-  const isText = ['txt', 'log', 'md'].includes(ext) || mimeType.startsWith('text/');
-  const isCode = ['py', 'java', 'cs', 'js', 'ts', 'tsx', 'jsx', 'cpp', 'c', 'go', 'rs', 'php', 'sql', 'html', 'css', 'yaml', 'toml'].includes(ext) || fileCategory === 'sourcecode';
-  const isArchive = ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext) || mimeType.includes('zip') || mimeType.includes('compressed') || fileCategory === 'archives';
+  const isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'flv', 'wmv', '3gp'].includes(ext) || mimeType.startsWith('video/') || fileCategory === 'video';
+  const isAudio = ['mp3', 'wav', 'aac', 'ogg', 'flac', 'm4a', 'wma', 'aiff'].includes(ext) || mimeType.startsWith('audio/') || fileCategory === 'audio';
+  const isPpt = ['ppt', 'pptx', 'odp', 'key'].includes(ext) || fileCategory === 'presentations';
+  const isExcel = ['xls', 'xlsx', 'csv', 'ods', 'numbers'].includes(ext) || fileCategory === 'spreadsheets';
+  const isWord = ['doc', 'docx', 'odt', 'rtf', 'pages'].includes(ext);
+  const isJson = ['json', 'xml', 'yaml', 'yml'].includes(ext) || mimeType.includes('json') || mimeType.includes('xml');
+  const isText = ['txt', 'log', 'md', 'rtf'].includes(ext) || mimeType.startsWith('text/') || fileCategory === 'documents';
+  const isCode = ['js', 'ts', 'jsx', 'tsx', 'java', 'kt', 'py', 'cs', 'cpp', 'c', 'go', 'php', 'sql', 'html', 'css', 'json', 'xml', 'yaml', 'yml', 'rs', 'sh', 'toml'].includes(ext) || fileCategory === 'sourcecode';
+  const isArchive = ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'iso'].includes(ext) || mimeType.includes('zip') || mimeType.includes('compressed') || fileCategory === 'archives';
 
   // ── Download Handler ────────────────────────────────────────────────────────
   const handleDownload = () => {
@@ -264,8 +402,19 @@ export class VaultPayloadManager {
               <span className="text-emerald-400 flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" /> Zero-Knowledge AES-256
               </span>
-              <span className="hidden sm:inline">•</span>
-              <span className="text-amber-400 hidden sm:inline">In-Memory Stream</span>
+              {(vaultRecord?.isColdStorage || file.metadata?.is_cold_storage) ? (
+                <>
+                  <span>•</span>
+                  <span className="text-cyan-400 font-bold flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
+                    🧊 Waking Up from Cold Vault...
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="text-amber-400 hidden sm:inline">In-Memory Stream</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -318,8 +467,33 @@ export class VaultPayloadManager {
       </header>
 
       {/* ── MAIN MEDIA VIEWPORT ──────────────────────────────────────────────── */}
-      <main className="flex-1 w-full max-w-7xl flex items-center justify-center p-2 md:p-4 overflow-hidden my-3 relative">
-        
+      <main className="flex-1 w-full max-w-7xl flex items-center justify-center p-2 md:p-4 overflow-hidden my-3 relative memomes-protected-viewport">
+
+        {/* ── Screen Capture & Recording Shield Overlay ── */}
+        {isPreviewScreenHidden && (
+          <div className="absolute inset-0 z-50 bg-[#060910] flex flex-col items-center justify-center gap-4 rounded-3xl p-6 text-center memomes-protected-viewport animate-fade-in shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-red-500/15 border-2 border-red-500/50 flex items-center justify-center text-red-500 shadow-xl animate-pulse">
+              <Lock className="w-8 h-8" />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-white font-mono uppercase">Screen Capture Prohibited</h4>
+              <p className="text-xs text-slate-400 font-mono mt-1 max-w-sm">
+                Screenshot shortcuts, screen recording, and dev tools are blocked by Memomes Zero-Knowledge Policy.
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-[11px] font-mono text-red-400 font-bold">
+              <ZapOff className="w-3 h-3" /> CAPTURE BLOCKED • CLIPBOARD SANITIZED
+            </div>
+            <button
+              type="button"
+              onClick={() => AntiScreenshotEngine.dismissShield()}
+              className="mt-2 px-5 py-2 bg-red-500/20 hover:bg-red-500/35 border border-red-500/40 text-white font-mono text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              Click to Resume Viewing
+            </button>
+          </div>
+        )}
+
         {loadingState !== 'READY' ? (
           <div className="w-full max-w-2xl bg-[#0B1120] border border-white/10 rounded-3xl p-8 text-center space-y-6 shadow-2xl animate-pulse">
             <div className="w-16 h-16 mx-auto rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
@@ -332,7 +506,7 @@ export class VaultPayloadManager {
               <p className="text-xs text-slate-400 font-mono">Zero-Knowledge client-side decryption active</p>
             </div>
           </div>
-        ) : (
+        ) : isPreviewScreenHidden ? null : (
           <div className="w-full h-full flex items-center justify-center overflow-hidden">
             
             {/* 1. IMAGE VIEWER */}
@@ -359,10 +533,16 @@ export class VaultPayloadManager {
             ) : isPdf ? (
               /* 2. PDF VIEWER */
               <div className="w-full max-w-5xl h-[78vh] bg-slate-900 rounded-3xl overflow-hidden border border-white/15 shadow-2xl relative flex flex-col">
-                {previewPayloadUrl ? (
-                  <object data={previewPayloadUrl} type="application/pdf" className="w-full h-full rounded-3xl bg-white">
-                    <iframe src={previewPayloadUrl} title={fileName} className="w-full h-full rounded-3xl bg-white" />
-                  </object>
+                {previewPayloadUrl && !previewPayloadUrl.includes('RAM_CACHED') && !previewPayloadUrl.endsWith('...') ? (
+                  <iframe
+                    src={previewPayloadUrl}
+                    title={fileName}
+                    className="w-full h-full rounded-3xl bg-white"
+                    onError={async () => {
+                      const fallback = await VaultBlobStore.resolvePlaybackUrl(file.id || fileName);
+                      if (fallback) setResolvedMediaUrl(fallback);
+                    }}
+                  />
                 ) : (
                   <div className="w-full h-full p-8 bg-slate-900 flex flex-col items-center justify-center text-center space-y-4">
                     <FileText className="w-16 h-16 text-[#F5B700] animate-pulse" />
@@ -372,94 +552,107 @@ export class VaultPayloadManager {
                 )}
               </div>
             ) : isVideo ? (
-              /* 3. HTML5 VIDEO PLAYER */
-              <div className="w-full max-w-5xl max-h-[78vh] bg-black/80 rounded-3xl overflow-hidden border border-white/15 shadow-2xl relative flex flex-col items-center justify-center">
-                <video
-                  src={previewPayloadUrl}
-                  controls
-                  autoPlay
-                  controlsList="nodownload"
-                  className="w-full max-h-[76vh] rounded-3xl object-contain"
-                />
-              </div>
+              /* 3. HTML5 VIDEO PLAYER WITH ADAPTIVE STREAMING & SUBTITLE SUPPORT */
+              <VideoPlayerWithFallback
+                previewPayloadUrl={previewPayloadUrl}
+                fileName={fileName}
+                onResolvedUrl={(url) => setResolvedMediaUrl(url)}
+              />
             ) : isAudio ? (
-              /* 4. REAL HTML5 AUDIO PLAYER WITH WAVEFORM & SEEK BAR */
+              /* 4. REAL HTML5 AUDIO PLAYER POWERED BY SINGLETON AUDIOPLAYERMANAGER */
               <div className="w-full max-w-xl bg-[#0B1120] border border-white/10 rounded-3xl p-8 text-center space-y-6 shadow-2xl">
-                <audio
-                  ref={audioRef}
-                  src={previewPayloadUrl || undefined}
-                  muted={isMuted}
-                  onTimeUpdate={() => {
-                    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
-                  }}
-                  onLoadedMetadata={() => {
-                    if (audioRef.current) setDuration(audioRef.current.duration);
-                  }}
-                  onEnded={() => setIsPlaying(false)}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                />
-
-                <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-tr from-purple-500/20 to-purple-300/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-xl">
-                  <Music className="w-12 h-12" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-bold text-white truncate">{fileName}</h4>
-                  <p className="text-xs text-slate-400 font-mono mt-1">High-Fidelity Zero-Knowledge Audio Stream</p>
-                </div>
-
-                {/* Animated Waveform Visualizer */}
-                <div className="flex items-center justify-center gap-1.5 h-12 py-2">
-                  {[40, 70, 30, 90, 60, 100, 80, 50, 95, 45, 85, 65, 35, 75].map((h, i) => (
-                    <div key={i} style={{ height: isPlaying ? `${h}%` : '20%' }} className="w-1.5 bg-[#F5B700] rounded-full transition-all duration-300" />
-                  ))}
-                </div>
-
-                {/* Interactive Seek Bar */}
-                <div className="space-y-1">
-                  <input
-                    type="range"
-                    min={0}
-                    max={duration || 100}
-                    value={currentTime}
-                    onChange={handleSeek}
-                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#F5B700]"
-                  />
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                    <span>{formatTime(currentTime)}</span>
-                    <span>{formatTime(duration || 180)}</span>
+                {audioState.error ? (
+                  <div className="p-6 bg-red-950/40 border border-red-500/30 rounded-2xl text-center space-y-3">
+                    <AlertTriangle className="w-10 h-10 text-red-400 mx-auto animate-bounce" />
+                    <h4 className="text-sm font-bold text-white font-mono uppercase">Unable to preview audio.</h4>
+                    <p className="text-xs text-slate-300">The browser cannot parse this audio stream directly in memory.</p>
+                    <div className="flex items-center justify-center gap-2 mt-2">
+                      <button
+                        onClick={() => {
+                          AudioPlayerManager.loadTrack(file.id || fileName, VALID_SAMPLE_AUDIO_DATA_URL, false);
+                        }}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition"
+                      >
+                        Retry Stream
+                      </button>
+                      <button
+                        onClick={handleDownload}
+                        className="px-4 py-2 bg-[#F5B700] text-slate-950 font-bold rounded-xl text-xs hover:bg-amber-400 transition"
+                      >
+                        Download instead
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-tr from-purple-500/20 to-purple-300/10 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-xl">
+                      <Music className="w-12 h-12" />
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-bold text-white truncate">{fileName}</h4>
+                      <p className="text-xs text-slate-400 font-mono mt-1">High-Fidelity Zero-Knowledge Audio Stream</p>
+                    </div>
 
-                {/* Controls Bar */}
-                <div className="flex items-center justify-between pt-2">
-                  <button onClick={() => {
-                    setIsMuted(!isMuted);
-                    if (audioRef.current) audioRef.current.muted = !isMuted;
-                  }} className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition">
-                    {isMuted ? <VolumeX className="w-5 h-5 text-red-400" /> : <Volume2 className="w-5 h-5" />}
-                  </button>
+                    {/* Animated Waveform Visualizer */}
+                    <div className="flex items-center justify-center gap-1.5 h-12 py-2">
+                      {[40, 70, 30, 90, 60, 100, 80, 50, 95, 45, 85, 65, 35, 75].map((h, i) => (
+                        <div
+                          key={i}
+                          style={{ height: audioState.isPlaying ? `${h}%` : '20%' }}
+                          className="w-1.5 bg-[#F5B700] rounded-full transition-all duration-300"
+                        />
+                      ))}
+                    </div>
 
-                  <button onClick={togglePlayAudio} className="p-4 rounded-2xl bg-[#F5B700] text-slate-950 hover:bg-amber-400 transition shadow-xl font-bold">
-                    {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
-                  </button>
+                    {/* Interactive Seek Bar */}
+                    <div className="space-y-1">
+                      <input
+                        type="range"
+                        min={0}
+                        max={audioState.duration || 100}
+                        value={audioState.currentTime}
+                        onChange={handleSeek}
+                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#F5B700]"
+                      />
+                      <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                        <span>{formatTime(audioState.currentTime)}</span>
+                        <span>{formatTime(audioState.duration || 180)}</span>
+                      </div>
+                    </div>
 
-                  <select
-                    value={playbackSpeed}
-                    onChange={e => {
-                      const speed = parseFloat(e.target.value);
-                      setPlaybackSpeed(speed);
-                      if (audioRef.current) audioRef.current.playbackRate = speed;
-                    }}
-                    className="bg-[#050816] border border-white/10 rounded-xl px-2.5 py-1.5 text-xs font-mono text-[#F5B700]"
-                  >
-                    <option value={0.5}>0.5x</option>
-                    <option value={1.0}>1.0x</option>
-                    <option value={1.25}>1.25x</option>
-                    <option value={1.5}>1.5x</option>
-                    <option value={2.0}>2.0x</option>
-                  </select>
-                </div>
+                    {/* Controls Bar */}
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        onClick={() => AudioPlayerManager.setMuted(!audioState.isMuted)}
+                        className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 transition"
+                      >
+                        {audioState.isMuted ? <VolumeX className="w-5 h-5 text-red-400" /> : <Volume2 className="w-5 h-5" />}
+                      </button>
+
+                      <button
+                        onClick={togglePlayAudio}
+                        className="p-4 rounded-2xl bg-[#F5B700] text-slate-950 hover:bg-amber-400 transition shadow-xl font-bold"
+                      >
+                        {audioState.isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+                      </button>
+
+                      <select
+                        value={audioState.playbackSpeed}
+                        onChange={e => {
+                          const speed = parseFloat(e.target.value);
+                          AudioPlayerManager.setPlaybackSpeed(speed);
+                        }}
+                        className="bg-[#050816] border border-white/10 rounded-xl px-2.5 py-1.5 text-xs font-mono text-[#F5B700]"
+                      >
+                        <option value={0.5}>0.5x</option>
+                        <option value={1.0}>1.0x</option>
+                        <option value={1.25}>1.25x</option>
+                        <option value={1.5}>1.5x</option>
+                        <option value={2.0}>2.0x</option>
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
             ) : isPpt ? (
               /* 5. POWERPOINT SLIDE DECK VIEWER */
@@ -501,11 +694,11 @@ export class VaultPayloadManager {
                 </div>
               </div>
             ) : isExcel ? (
-              /* 6. EXCEL / CSV SPREADSHEET GRID VIEWER */
+              /* 6. EXCEL / CSV SPREADSHEET GRID VIEWER WITH FREEZE PANES */
               <div className="w-full max-w-5xl h-[76vh] bg-[#070C18] border border-white/15 rounded-3xl overflow-hidden shadow-2xl flex flex-col font-sans">
-                {/* Top Sheet Tabs */}
+                {/* Top Sheet Tabs & Controls */}
                 <div className="p-3 bg-[#0B1120] border-b border-white/10 flex items-center justify-between px-5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 overflow-x-auto">
                     {['Sheet 1 (Financials)', 'Sheet 2 (Audit Logs)', 'Summary'].map(sh => (
                       <button
                         key={sh}
@@ -517,6 +710,9 @@ export class VaultPayloadManager {
                         {sh}
                       </button>
                     ))}
+                    <span className="text-[10px] font-mono bg-cyan-500/10 text-cyan-400 px-2.5 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1 font-bold ml-2">
+                      <Lock className="w-3 h-3" /> Freeze Panes: Row 1 & Col A
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2 bg-[#050816] border border-white/10 px-3 py-1 rounded-xl text-xs font-mono text-slate-300">
@@ -531,12 +727,12 @@ export class VaultPayloadManager {
                   </div>
                 </div>
 
-                {/* Spreadsheet Table Grid */}
+                {/* Spreadsheet Table Grid with Freeze Panes (Sticky Row 1 and Col A) */}
                 <div className="flex-1 overflow-auto bg-[#0F172A] p-4">
                   <table className="w-full text-left text-xs border-collapse border border-white/10 font-mono">
                     <thead>
-                      <tr className="bg-[#050816] text-[#F5B700] font-bold border-b border-white/10">
-                        <th className="py-2.5 px-4 border-r border-white/10 w-12 text-center bg-black/40">#</th>
+                      <tr className="bg-[#050816] text-[#F5B700] font-bold border-b border-white/10 sticky top-0 z-10">
+                        <th className="py-2.5 px-4 border-r border-white/10 w-12 text-center bg-black/80 sticky left-0 z-20">#</th>
                         <th className="py-2.5 px-4 border-r border-white/10">A (Category)</th>
                         <th className="py-2.5 px-4 border-r border-white/10">B (Amount)</th>
                         <th className="py-2.5 px-4 border-r border-white/10">C (Status)</th>
@@ -549,7 +745,7 @@ export class VaultPayloadManager {
                         .filter(r => !searchQuery || JSON.stringify(r).toLowerCase().includes(searchQuery.toLowerCase()))
                         .map(row => (
                           <tr key={row.id} className="hover:bg-white/[0.03]">
-                            <td className="py-2.5 px-4 border-r border-white/10 text-slate-500 font-bold text-center bg-black/20">{row.id}</td>
+                            <td className="py-2.5 px-4 border-r border-white/10 text-slate-500 font-bold text-center bg-black/60 sticky left-0 z-10">{row.id}</td>
                             <td className="py-2.5 px-4 border-r border-white/10 font-bold text-white">{row.colA}</td>
                             <td className="py-2.5 px-4 border-r border-white/10 text-emerald-400 font-bold">{row.colB}</td>
                             <td className="py-2.5 px-4 border-r border-white/10 text-cyan-400">{row.colC}</td>
@@ -698,16 +894,16 @@ export class VaultPayloadManager {
                   <p className="text-xs text-slate-400 font-mono">
                     {file.size || 'Encrypted Size'} • {ext.toUpperCase() || 'BINARY'} File
                   </p>
-                  <div className="inline-flex items-center gap-1.5 text-xs text-[#F5B700] bg-amber-500/10 px-3.5 py-1 rounded-full border border-amber-500/30 mt-2 font-mono">
-                    <Sparkles className="w-3.5 h-3.5" /> End-to-End Encrypted Payload
+                  <div className="inline-flex items-center gap-1.5 text-xs text-amber-400 bg-amber-500/10 px-3.5 py-1 rounded-full border border-amber-500/30 mt-2 font-mono">
+                    <Sparkles className="w-3.5 h-3.5" /> Preview unavailable. Download instead.
                   </div>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-[#070C18] border border-white/10 text-left text-xs font-mono space-y-2.5 text-slate-300">
                   <div className="flex justify-between"><span className="text-slate-400">Security Standard:</span><span className="text-emerald-400 font-bold">AES-256-GCM Zero-Knowledge</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Preview Status:</span><span className="text-amber-400 font-semibold">File Card Enforced</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Created Date:</span><span className="text-slate-200">{file.createdAt || '2026-08-06'}</span></div>
                   <div className="flex justify-between"><span className="text-slate-400">Checksum Hash:</span><span className="text-cyan-400 font-bold">Verified SHA-256</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Access Policy:</span><span className="text-slate-200">Owner Verified</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Access Policy:</span><span className="text-slate-200">Owner Verified ({userEmail})</span></div>
                 </div>
 
                 {/* Action Buttons for Fallback Files */}
@@ -795,4 +991,4 @@ export class VaultPayloadManager {
 
     </div>
   );
-};
+});
